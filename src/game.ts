@@ -124,6 +124,7 @@ export function createInputState(): InputState {
 }
 
 export function createGameState(width: number, height: number): GameState {
+  const cave = generateCave();
   return {
     ship: {
       x: 0,
@@ -135,8 +136,8 @@ export function createGameState(width: number, height: number): GameState {
       alive: true,
     },
     bullets: [],
-    asteroids: spawnWave(1),
-    cave: generateCave(2500, 300),
+    asteroids: spawnWave(1, cave),
+    cave,
     score: 0,
     lives: 3,
     wave: 1,
@@ -282,7 +283,7 @@ export function updateGame(
 
   if (state.waveClearAt > 0 && now >= state.waveClearAt) {
     state.wave += 1;
-    state.asteroids = spawnWave(state.wave);
+    state.asteroids = spawnWave(state.wave, state.cave);
     state.waveClearAt = 0;
     state.ship.invulnerableUntil = now + INVULNERABILITY_TIME;
   }
@@ -379,14 +380,37 @@ export function loseLife(state: GameState, now: number) {
   }
 }
 
-function spawnWave(wave: number): Asteroid[] {
+function isPointInPolygon(px: number, py: number, polygon: Vector[]) {
+  let inside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i) {
+    const pI = polygon[i]!;
+    const pJ = polygon[j]!;
+    const intersect = ((pI.y > py) !== (pJ.y > py)) && (px < (pJ.x - pI.x) * (py - pI.y) / (pJ.y - pI.y) + pI.x);
+    if (intersect) inside = !inside;
+    i += 1;
+  }
+  return inside;
+}
+
+function spawnWave(wave: number, cave: Vector[]): Asteroid[] {
   const count = Math.min(4 + wave, 10);
   const asteroids: Asteroid[] = [];
   for (let i = 0; i < count; i += 1) {
-    const angle = Math.random() * Math.PI * 2;
-    const dist = 450 + Math.random() * 900;
-    const x = Math.cos(angle) * dist;
-    const y = Math.sin(angle) * dist;
+    let x = 0;
+    let y = 0;
+    let valid = false;
+    for (let tries = 0; tries < 100; tries += 1) {
+      const angle = Math.random() * Math.PI * 2;
+      const dist = 200 + Math.random() * 2500;
+      const testX = Math.cos(angle) * dist;
+      const testY = Math.sin(angle) * dist;
+      if (cave.length === 0 || isPointInPolygon(testX, testY, cave)) {
+        x = testX;
+        y = testY;
+        valid = true;
+        break;
+      }
+    }
     const vxAngle = Math.random() * Math.PI * 2;
     const size: AsteroidSize = Math.random() > 0.7 ? 2 : 3;
     const speed = ASTEROID_SPEED[size] * (0.55 + wave * 0.03);

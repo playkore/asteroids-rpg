@@ -1,3 +1,4 @@
+// src/game.test.ts
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { generateCave } from './cave';
 import { createGameState, createInputState, linesIntersect, updateGame } from './game';
@@ -7,13 +8,13 @@ afterEach(() => {
 });
 
 describe('game logic', () => {
-  it('creates a large cave and spawns the ship at the origin', () => {
+  it('creates a large maze cave and spawns the ship at the origin', () => {
     const state = createGameState(800, 600);
 
     expect(state.ship.x).toBe(0);
     expect(state.ship.y).toBe(0);
-    expect(state.cave).toHaveLength(300);
-    expect(state.cave.every((point) => Math.hypot(point.x, point.y) > 1800)).toBe(true);
+    expect(state.cave.length).toBeGreaterThan(100);
+    expect(Math.max(...state.cave.map((point) => Math.hypot(point.x, point.y)))).toBeGreaterThan(500);
   });
 
   it('increments score when a bullet hits an asteroid', () => {
@@ -132,9 +133,9 @@ describe('game logic', () => {
 
 describe('cave generation', () => {
   it('generates a closed organic polygon', () => {
-    const cave = generateCave(2500, 300);
+    const cave = generateCave();
 
-    expect(cave).toHaveLength(300);
+    expect(cave.length).toBeGreaterThan(100);
     expect(cave[0]).toEqual(expect.objectContaining({ x: expect.any(Number), y: expect.any(Number) }));
   });
 });
