@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createGameState } from '../src/game';
 import { drawGame } from '../src/renderer';
-import { UI_LINE_WIDTH } from '../src/constants';
+import { UI_LINE_COLOR, UI_LINE_WIDTH } from '../src/constants';
 
 function createMockContext() {
   return {
@@ -32,9 +32,11 @@ describe('drawGame', () => {
     const ctx = createMockContext();
     const state = createGameState(320, 240);
     state.asteroids = [];
+    state.bullets = [];
 
     drawGame(ctx, state, 0, 1, false);
 
     expect(ctx.lineWidth).toBe(UI_LINE_WIDTH);
+    expect(ctx.strokeStyle).toBe(UI_LINE_COLOR);
   });
 });

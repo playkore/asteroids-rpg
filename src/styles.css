@@ -7,6 +7,7 @@
   --text: #f5f9ff;
   --muted: #a8b2bf;
   --ui-line-width: 2.5px;
+  --ui-line-color: #f4fbff;
 }
 
 * {
@@ -83,7 +84,7 @@ button {
   max-width: 120px;
   padding: 8px 10px;
   border-radius: 12px;
-  border: var(--ui-line-width) solid #303844;
+  border: var(--ui-line-width) solid var(--ui-line-color);
   background: #070a10;
 }
 
@@ -116,7 +117,7 @@ button {
   width: 144px;
   height: 144px;
   border-radius: 50%;
-  border: var(--ui-line-width) solid #c5cfda;
+  border: var(--ui-line-width) solid var(--ui-line-color);
   background: #090d13;
   pointer-events: none;
   touch-action: none;
@@ -129,14 +130,14 @@ button {
 .joystick__base {
   width: 144px;
   height: 144px;
-  border: var(--ui-line-width) solid #2f3743;
+  border: var(--ui-line-width) solid var(--ui-line-color);
   background: #090d13;
 }
 
 .joystick__knob {
   width: 58px;
   height: 58px;
-  border: var(--ui-line-width) solid #dce4ee;
+  border: var(--ui-line-width) solid var(--ui-line-color);
   background: #111720;
   transform: translate(calc(-50% + var(--knob-x, 0px)), calc(-50% + var(--knob-y, 0px)));
 }
@@ -157,7 +158,7 @@ button {
   right: 14px;
   width: 48px;
   height: 48px;
-  border: var(--ui-line-width) solid #c5cfda;
+  border: var(--ui-line-width) solid var(--ui-line-color);
   border-radius: 12px;
   background: #090d13;
   padding: 0;
@@ -174,7 +175,7 @@ button {
 
 .map-toggle__frame {
   inset: 11px;
-  border: var(--ui-line-width) solid #dce4ee;
+  border: var(--ui-line-width) solid var(--ui-line-color);
   border-radius: 7px;
 }
 
@@ -182,15 +183,15 @@ button {
   width: 18px;
   height: 18px;
   background:
-    linear-gradient(#dce4ee, #dce4ee) 50% 0 / var(--ui-line-width) 100% no-repeat,
-    linear-gradient(#dce4ee, #dce4ee) 0 50% / 100% var(--ui-line-width) no-repeat;
+    linear-gradient(var(--ui-line-color), var(--ui-line-color)) 50% 0 / var(--ui-line-width) 100% no-repeat,
+    linear-gradient(var(--ui-line-color), var(--ui-line-color)) 0 50% / 100% var(--ui-line-width) no-repeat;
 }
 
 .overlay__panel {
   width: min(90vw, 360px);
   padding: 24px;
   border-radius: 18px;
-  border: var(--ui-line-width) solid #303844;
+  border: var(--ui-line-width) solid var(--ui-line-color);
   background: #070a10;
   text-align: center;
 }
@@ -203,7 +204,7 @@ button {
 }
 
 .overlay__button {
-  border: var(--ui-line-width) solid #c5cfda;
+  border: var(--ui-line-width) solid var(--ui-line-color);
   padding: 12px 20px;
   border-radius: 999px;
   font-weight: 400;
@@ -223,7 +224,7 @@ button {
   position: absolute;
   top: max(env(safe-area-inset-top), 14px);
   right: 14px;
-  border: var(--ui-line-width) solid #c5cfda;
+  border: var(--ui-line-width) solid var(--ui-line-color);
   border-radius: 999px;
   background: #090d13;
   color: var(--text);

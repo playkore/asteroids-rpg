@@ -1,5 +1,5 @@
 import type { Asteroid, Bullet, GameState, Ship } from './game';
-import { UI_LINE_WIDTH } from './constants';
+import { UI_LINE_COLOR, UI_LINE_WIDTH } from './constants';
 
 export function drawGame(
   ctx: CanvasRenderingContext2D,
@@ -37,7 +37,7 @@ function drawAsteroids(ctx: CanvasRenderingContext2D, asteroids: Asteroid[]) {
     const points = asteroidShape(asteroid.radius);
     ctx.save();
     ctx.translate(asteroid.x, asteroid.y);
-    ctx.strokeStyle = '#dce4ee';
+    ctx.strokeStyle = UI_LINE_COLOR;
     ctx.lineWidth = UI_LINE_WIDTH;
     ctx.beginPath();
     points.forEach((point, index) => {
@@ -53,7 +53,7 @@ function drawAsteroids(ctx: CanvasRenderingContext2D, asteroids: Asteroid[]) {
 }
 
 function drawBullets(ctx: CanvasRenderingContext2D, bullets: Bullet[]) {
-  ctx.fillStyle = '#fff1a8';
+  ctx.fillStyle = UI_LINE_COLOR;
   for (const bullet of bullets) {
     ctx.beginPath();
     ctx.arc(bullet.x, bullet.y, 2, 0, Math.PI * 2);
@@ -69,7 +69,7 @@ function drawShip(ctx: CanvasRenderingContext2D, ship: Ship, flameVisible: boole
   ctx.save();
   ctx.translate(ship.x, ship.y);
   ctx.rotate(ship.angle);
-  ctx.strokeStyle = '#f4fbff';
+  ctx.strokeStyle = UI_LINE_COLOR;
   ctx.lineWidth = UI_LINE_WIDTH;
   ctx.lineJoin = 'round';
   ctx.lineCap = 'round';
