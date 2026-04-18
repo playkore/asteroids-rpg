@@ -26,6 +26,8 @@ export function useGameLoop(paused: boolean) {
   const movementRef = useRef<JoystickVector>({
     x: 0,
     y: 0,
+    centerX: 0,
+    centerY: 0,
     active: false,
   });
   const rafRef = useRef<number | null>(null);
@@ -53,7 +55,7 @@ export function useGameLoop(paused: boolean) {
   const restartGame = useCallback(() => {
     resetGameState(gameRef.current);
     inputRef.current = createInputState();
-    movementRef.current = { x: 0, y: 0, active: false };
+    movementRef.current = { x: 0, y: 0, centerX: 0, centerY: 0, active: false };
     lastFrameRef.current = null;
     setHud({
       score: gameRef.current.score,

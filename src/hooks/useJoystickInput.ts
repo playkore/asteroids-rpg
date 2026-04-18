@@ -4,14 +4,16 @@ import type { PointerEventHandler } from 'react';
 export type JoystickVector = {
   x: number;
   y: number;
+  centerX: number;
+  centerY: number;
   active: boolean;
 };
 
 export type JoystickBindings = {
-  onPointerDown: PointerEventHandler<HTMLButtonElement>;
-  onPointerMove: PointerEventHandler<HTMLButtonElement>;
-  onPointerUp: PointerEventHandler<HTMLButtonElement>;
-  onPointerCancel: PointerEventHandler<HTMLButtonElement>;
+  onPointerDown: PointerEventHandler<HTMLElement>;
+  onPointerMove: PointerEventHandler<HTMLElement>;
+  onPointerUp: PointerEventHandler<HTMLElement>;
+  onPointerCancel: PointerEventHandler<HTMLElement>;
 };
 
 type JoystickState = {
@@ -43,6 +45,8 @@ export function useJoystickInput({
   const [viewState, setViewState] = useState<JoystickVector>({
     x: 0,
     y: 0,
+    centerX: 0,
+    centerY: 0,
     active: false,
   });
 
@@ -51,6 +55,8 @@ export function useJoystickInput({
     const next = {
       x: state.active ? state.x : 0,
       y: state.active ? state.y : 0,
+      centerX: state.centerX,
+      centerY: state.centerY,
       active: state.active,
     };
     setViewState(next);
@@ -66,7 +72,7 @@ export function useJoystickInput({
     emit();
   }, [emit]);
 
-  const onPointerDown = useCallback<PointerEventHandler<HTMLButtonElement>>(
+  const onPointerDown = useCallback<PointerEventHandler<HTMLElement>>(
     (event) => {
       if (!enabled) {
         return;
@@ -85,7 +91,7 @@ export function useJoystickInput({
     [enabled, emit],
   );
 
-  const onPointerMove = useCallback<PointerEventHandler<HTMLButtonElement>>(
+  const onPointerMove = useCallback<PointerEventHandler<HTMLElement>>(
     (event) => {
       const state = stateRef.current;
       if (!state.active || state.pointerId !== event.pointerId) {
@@ -106,7 +112,7 @@ export function useJoystickInput({
     [emit, radius],
   );
 
-  const endPointer = useCallback<PointerEventHandler<HTMLButtonElement>>(
+  const endPointer = useCallback<PointerEventHandler<HTMLElement>>(
     (event) => {
       const state = stateRef.current;
       if (state.pointerId !== event.pointerId) {

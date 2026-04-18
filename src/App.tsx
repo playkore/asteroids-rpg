@@ -13,7 +13,7 @@ export default function App() {
 
   useEffect(() => {
     if (screen.mode !== 'play') {
-      setMovement({ x: 0, y: 0, active: false });
+      setMovement({ x: 0, y: 0, centerX: 0, centerY: 0, active: false });
     }
   }, [screen.mode, setMovement]);
 

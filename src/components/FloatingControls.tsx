@@ -1,5 +1,5 @@
 import { useEffect, type CSSProperties } from 'react';
-import { useJoystickInput } from '../hooks/useJoystickInput';
+import { useJoystickInput, type JoystickVector } from '../hooks/useJoystickInput';
 
 const JOYSTICK_RADIUS = 56;
 
@@ -10,7 +10,7 @@ export default function FloatingControls({
   onFireEnd,
 }: {
   enabled: boolean;
-  onMovementChange: (movement: { x: number; y: number; active: boolean }) => void;
+  onMovementChange: (movement: JoystickVector) => void;
   onFireStart: () => void;
   onFireEnd: () => void;
 }) {
@@ -27,28 +27,28 @@ export default function FloatingControls({
   }, [enabled, reset]);
 
   return (
-    <>
-      <button
+    <div className="controls-layer" aria-hidden={!enabled}>
+      <div className="controls-surface" {...bindings} />
+
+      <div
         className={`joystick${vector.active ? ' is-active' : ''}`}
-        type="button"
-        aria-label="Virtual joystick"
+        aria-hidden="true"
         style={(
           vector.active
             ? {
                 display: 'grid',
-                left: '50%',
-                top: '50%',
+                left: `${vector.centerX}px`,
+                top: `${vector.centerY}px`,
                 transform: 'translate(-50%, -50%)',
                 '--knob-x': `${vector.x * JOYSTICK_RADIUS}px`,
                 '--knob-y': `${vector.y * JOYSTICK_RADIUS}px`,
               }
             : { display: 'none' }
         ) as CSSProperties}
-        {...bindings}
       >
         <span className="joystick__base" />
         <span className="joystick__knob" />
-      </button>
+      </div>
 
       <button
         className="fire"
@@ -61,6 +61,6 @@ export default function FloatingControls({
         <span className="fire__ring" />
         <span className="fire__plus" />
       </button>
-    </>
+    </div>
   );
 }

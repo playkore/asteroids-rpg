@@ -55,6 +55,21 @@ button {
   gap: 10px;
   justify-content: space-between;
   pointer-events: none;
+  z-index: 2;
+}
+
+.controls-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.controls-surface {
+  position: absolute;
+  inset: 0;
+  pointer-events: auto;
+  touch-action: none;
 }
 
 .hud__pill {
@@ -98,6 +113,7 @@ button {
   padding: 0;
   pointer-events: auto;
   -webkit-tap-highlight-color: #05070c;
+  z-index: 4;
 }
 
 .fire__ring,
@@ -149,6 +165,7 @@ button {
   -webkit-tap-highlight-color: #05070c;
   display: none;
   transform: translate3d(-1000px, -1000px, 0);
+  z-index: 4;
 }
 
 .joystick__base {
@@ -187,6 +204,7 @@ button {
   display: grid;
   place-items: center;
   pointer-events: auto;
+  z-index: 4;
 }
 
 .map-toggle__frame,
@@ -251,6 +269,7 @@ button {
   color: var(--text);
   padding: 10px 16px;
   letter-spacing: 0.12em;
+  z-index: 4;
 }
 
 .map {
