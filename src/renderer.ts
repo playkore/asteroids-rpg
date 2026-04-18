@@ -1,4 +1,5 @@
 import type { Asteroid, Bullet, GameState, Ship } from './game';
+import { UI_LINE_WIDTH } from './constants';
 
 export function drawGame(
   ctx: CanvasRenderingContext2D,
@@ -37,7 +38,7 @@ function drawAsteroids(ctx: CanvasRenderingContext2D, asteroids: Asteroid[]) {
     ctx.save();
     ctx.translate(asteroid.x, asteroid.y);
     ctx.strokeStyle = '#dce4ee';
-    ctx.lineWidth = 2.5;
+    ctx.lineWidth = UI_LINE_WIDTH;
     ctx.beginPath();
     points.forEach((point, index) => {
       const px = Math.cos(point.angle) * asteroid.radius * point.distance;
@@ -69,7 +70,7 @@ function drawShip(ctx: CanvasRenderingContext2D, ship: Ship, flameVisible: boole
   ctx.translate(ship.x, ship.y);
   ctx.rotate(ship.angle);
   ctx.strokeStyle = '#f4fbff';
-  ctx.lineWidth = 2.5;
+  ctx.lineWidth = UI_LINE_WIDTH;
   ctx.lineJoin = 'round';
   ctx.lineCap = 'round';
   ctx.beginPath();
