@@ -168,7 +168,18 @@ describe('drawGame', () => {
       { x: -20, y: 20 },
     ];
     state.portals = [
-      { x: 10, y: 0, key: 'portal-1', spawnAnchor: { x: 0, y: 0 }, targetSeed: 'ALPHA-7X', kind: 'forward' },
+      {
+        x: 10,
+        y: 0,
+        key: 'portal-1',
+        spawnAnchor: { x: 0, y: 0 },
+        connection: {
+          key: 'main:0:0',
+          kind: 'main',
+          targetSeed: 'ALPHA-7X',
+          targetDepth: 1,
+        },
+      },
     ];
     state.asteroids = [];
     state.bullets = [];

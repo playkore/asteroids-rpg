@@ -1,5 +1,6 @@
 import { generateCaveLayout } from './cave';
-import { createSeededRandom, deriveSeed, generateSeed } from './seed';
+import { LevelGraph, type LevelConnection, type LevelNode } from './levelGraph';
+import { createSeededRandom, generateSeed } from './seed';
 
 export type Vector = {
   x: number;
@@ -36,11 +37,12 @@ export type Asteroid = {
 };
 
 export type GameState = {
+  rootSeed: string;
   seed: string;
   random: () => number;
-  parentSeed: string | null;
-  parentPortalKey: string | null;
-  levelHistory: LevelFrameMeta[];
+  graph: LevelGraph;
+  currentNode: LevelNode;
+  nodeHistory: LevelNode[];
   ship: Ship;
   bullets: Bullet[];
   asteroids: Asteroid[];
@@ -88,20 +90,11 @@ export type Portal = {
   x: number;
   y: number;
   spawnAnchor: Vector;
-  targetSeed: string;
-  kind: 'forward' | 'back';
-};
-
-export type LevelFrameMeta = {
-  seed: string;
-  parentSeed: string | null;
-  parentPortalKey: string | null;
+  connection: LevelConnection;
 };
 
 type CreateGameStateOptions = {
-  parentSeed?: string | null;
-  parentPortalKey?: string | null;
-  levelHistory?: LevelFrameMeta[];
+  graph?: LevelGraph;
 };
 
 const SHIP_RADIUS = 12;
@@ -160,32 +153,16 @@ export function createGameState(
   seed = generateSeed(),
   options: CreateGameStateOptions = {},
 ): GameState {
-  const random = createSeededRandom(seed);
-  const caveLayout = generateCaveLayout(random);
-  const levelHistory = options.levelHistory ?? [];
-  const parentSeed = options.parentSeed ?? null;
-  const parentPortalKey = options.parentPortalKey ?? null;
-  const backPortalIndex =
-    parentSeed === null || caveLayout.deadEnds.length === 0
-      ? -1
-      : Math.floor(createSeededRandom(`${seed}|${parentSeed}`)() * caveLayout.deadEnds.length);
-  const portals = caveLayout.deadEnds.map((deadEnd, index) => ({
-    key: deadEnd.key,
-    x: deadEnd.x,
-    y: deadEnd.y,
-    spawnAnchor: deadEnd.spawnAnchor,
-    kind: index === backPortalIndex ? ('back' as const) : ('forward' as const),
-    targetSeed:
-      index === backPortalIndex
-        ? parentSeed ?? deriveSeed(seed, deadEnd.key)
-        : deriveSeed(seed, deadEnd.key),
-  }));
+  const graph = options.graph ?? new LevelGraph();
+  const rootNode = graph.createRoot(seed);
+  const level = generateLevel(rootNode, graph, 1);
   return {
-    seed,
-    random,
-    parentSeed,
-    parentPortalKey,
-    levelHistory,
+    rootSeed: rootNode.seed,
+    seed: rootNode.seed,
+    random: createSeededRandom(rootNode.seed),
+    graph,
+    currentNode: rootNode,
+    nodeHistory: [],
     ship: {
       x: 0,
       y: 0,
@@ -196,9 +173,9 @@ export function createGameState(
       alive: true,
     },
     bullets: [],
-    asteroids: spawnWave(1, caveLayout.boundary, random),
-    cave: caveLayout.boundary,
-    portals,
+    asteroids: level.asteroids,
+    cave: level.cave,
+    portals: level.portals,
     score: 0,
     lives: 3,
     wave: 1,
@@ -212,6 +189,39 @@ export function createGameState(
   };
 }
 
+function generateLevel(node: LevelNode, graph: LevelGraph, wave: number) {
+  const random = createSeededRandom(node.seed);
+  const caveLayout = generateCaveLayout(random);
+  const connections = graph.listConnections(node);
+  const portals = createPortals(connections, caveLayout.deadEnds);
+
+  return {
+    cave: caveLayout.boundary,
+    portals,
+    asteroids: spawnWave(wave, caveLayout.boundary, random),
+    random,
+  };
+}
+
+function createPortals(connections: LevelConnection[], deadEnds: { x: number; y: number; spawnAnchor: Vector }[]) {
+  const count = Math.min(connections.length, deadEnds.length);
+  const portals: Portal[] = [];
+
+  for (let i = 0; i < count; i += 1) {
+    const connection = connections[i]!;
+    const deadEnd = deadEnds[i]!;
+    portals.push({
+      key: connection.key,
+      x: deadEnd.x,
+      y: deadEnd.y,
+      spawnAnchor: deadEnd.spawnAnchor,
+      connection,
+    });
+  }
+
+  return portals;
+}
+
 export function resizeGameState(state: GameState, width: number, height: number) {
   state.width = width;
   state.height = height;
@@ -220,10 +230,8 @@ export function resizeGameState(state: GameState, width: number, height: number)
 export function restartGame(state: GameState) {
   releaseBullets(state.bullets);
   releaseAsteroids(state.asteroids);
-  const fresh = createGameState(state.width, state.height, state.seed, {
-    parentSeed: state.parentSeed,
-    parentPortalKey: state.parentPortalKey,
-    levelHistory: state.levelHistory,
+  const fresh = createGameState(state.width, state.height, state.rootSeed, {
+    graph: state.graph,
   });
   Object.assign(state, fresh);
 }
@@ -463,45 +471,57 @@ function travelThroughPortal(state: GameState, portal: Portal, now: number) {
   releaseBullets(state.bullets);
   releaseAsteroids(state.asteroids);
 
-  const previousFrame = state.levelHistory[state.levelHistory.length - 1] ?? null;
-  const nextSeed = portal.kind === 'back' ? state.parentSeed : portal.targetSeed;
-  if (!nextSeed) {
-    return;
-  }
-
-  const nextParentSeed = portal.kind === 'back' ? previousFrame?.parentSeed ?? null : state.seed;
-  const nextParentPortalKey = portal.kind === 'back' ? previousFrame?.parentPortalKey ?? null : portal.key;
-  const nextHistory =
-    portal.kind === 'back'
-      ? state.levelHistory.slice(0, -1)
-      : [
-          ...state.levelHistory,
-          {
-            seed: state.seed,
-            parentSeed: state.parentSeed,
-            parentPortalKey: state.parentPortalKey,
-          },
-        ];
-  const fresh = createGameState(state.width, state.height, nextSeed, {
-    parentSeed: nextParentSeed,
-    parentPortalKey: nextParentPortalKey,
-    levelHistory: nextHistory,
-  });
-
+  const departedNode = state.currentNode;
+  const nextNode = state.graph.followConnection(departedNode, portal.connection);
   const score = state.score;
   const lives = state.lives;
-  Object.assign(state, fresh);
+  const wave = state.wave;
+  let spawnPortalKey: string | null = null;
+
+  if (portal.connection.kind === 'back') {
+    const parentNode = state.nodeHistory.pop();
+    if (!parentNode) {
+      return;
+    }
+    state.currentNode = parentNode;
+    spawnPortalKey = departedNode.enteredVia;
+  } else {
+    state.nodeHistory.push(departedNode);
+    state.currentNode = nextNode;
+    spawnPortalKey = null;
+  }
+
+  const level = generateLevel(state.currentNode, state.graph, wave);
+  state.seed = state.currentNode.seed;
+  state.random = createSeededRandom(state.currentNode.seed);
+  state.cave = level.cave;
+  state.portals = level.portals;
+  state.asteroids = level.asteroids;
+  state.bullets = [];
   state.score = score;
   state.lives = lives;
-  state.wave = 1;
-  const returnPortal = state.portals.find((candidate) => candidate.kind === 'back') ?? null;
-  if (returnPortal) {
-    state.ship.x = returnPortal.spawnAnchor.x;
-    state.ship.y = returnPortal.spawnAnchor.y;
-    state.ship.vx = 0;
-    state.ship.vy = 0;
-  }
+  state.wave = wave;
+  state.ship.alive = true;
+  state.ship.vx = 0;
+  state.ship.vy = 0;
   state.ship.invulnerableUntil = now + INVULNERABILITY_TIME;
+  state.respawnAt = 0;
+  state.waveClearAt = 0;
+  state.nextShotAt = 0;
+
+  const spawnPortal =
+    (spawnPortalKey ? state.portals.find((candidate) => candidate.key === spawnPortalKey) : null) ??
+    state.portals.find((candidate) => candidate.connection.kind === 'back') ??
+    state.portals[0] ??
+    null;
+  if (spawnPortal) {
+    state.ship.x = spawnPortal.spawnAnchor.x;
+    state.ship.y = spawnPortal.spawnAnchor.y;
+  } else {
+    state.ship.x = 0;
+    state.ship.y = 0;
+  }
+
   state.portalCooldownUntil = now + 300;
 }
 
