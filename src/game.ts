@@ -70,7 +70,6 @@ export type HudState = {
   score: number;
   lives: number;
   wave: number;
-  frameRate: number;
   gameOver: boolean;
   ready: boolean;
 };
@@ -181,7 +180,6 @@ export function updateGame(
       score: state.score,
       lives: state.lives,
       wave: state.wave,
-      frameRate: 0,
       gameOver: true,
       ready: false,
     };
@@ -295,7 +293,6 @@ export function updateGame(
     score: state.score,
     lives: state.lives,
     wave: state.wave,
-    frameRate: 0,
     gameOver: state.gameOver,
     ready: !state.gameOver && state.ship.alive && now >= state.ship.invulnerableUntil,
   };
