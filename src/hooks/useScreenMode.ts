@@ -1,35 +1,36 @@
 import { useCallback, useEffect, type Dispatch, type SetStateAction } from 'react';
 
-export type ScreenMode = 'play' | 'map' | 'gameover';
+export type ScreenMode = 'start' | 'play' | 'map' | 'gameover';
 
 export function useScreenMode(
+  started: boolean,
   gameOver: boolean,
   mapOpen: boolean,
   setMapOpen: Dispatch<SetStateAction<boolean>>,
 ) {
   useEffect(() => {
-    if (gameOver) {
+    if (!started || gameOver) {
       setMapOpen(false);
     }
-  }, [gameOver, setMapOpen]);
+  }, [gameOver, setMapOpen, started]);
 
   const openMap = useCallback(() => {
-    if (!gameOver) {
+    if (started && !gameOver) {
       setMapOpen(true);
     }
-  }, [gameOver]);
+  }, [gameOver, started]);
 
   const closeMap = useCallback(() => {
     setMapOpen(false);
   }, []);
 
   const toggleMap = useCallback(() => {
-    if (!gameOver) {
+    if (started && !gameOver) {
       setMapOpen((value) => !value);
     }
-  }, [gameOver]);
+  }, [gameOver, started]);
 
-  const mode: ScreenMode = gameOver ? 'gameover' : mapOpen ? 'map' : 'play';
+  const mode: ScreenMode = !started ? 'start' : gameOver ? 'gameover' : mapOpen ? 'map' : 'play';
 
   return {
     mode,

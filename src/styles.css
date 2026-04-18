@@ -165,6 +165,66 @@ button {
   pointer-events: auto;
 }
 
+.start-screen {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: #05070c;
+  z-index: 6;
+  pointer-events: auto;
+}
+
+.start-screen__panel {
+  width: min(92vw, 420px);
+  padding: 24px;
+  border-radius: 18px;
+  border: var(--ui-line-width) solid var(--ui-line-color);
+  background: #070a10;
+}
+
+.start-screen__panel h1 {
+  margin: 0 0 18px;
+  font-size: clamp(2rem, 8vw, 3rem);
+  letter-spacing: 0.08em;
+  font-weight: 400;
+}
+
+.start-screen__seed {
+  display: block;
+}
+
+.start-screen__seed span {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.22em;
+  color: var(--muted);
+}
+
+.start-screen__input {
+  width: 100%;
+  padding: 12px 14px;
+  border: var(--ui-line-width) solid var(--ui-line-color);
+  border-radius: 12px;
+  background: #05070c;
+  color: var(--text);
+  font: inherit;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.start-screen__actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.start-screen__primary {
+  flex: 1;
+}
+
 .map-toggle {
   position: absolute;
   top: max(env(safe-area-inset-top), 14px);

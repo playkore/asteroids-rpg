@@ -3,13 +3,17 @@ import FloatingControls from './components/FloatingControls';
 import Hud from './components/Hud';
 import MapOverlay from './components/MapOverlay';
 import MapToggleButton from './components/MapToggleButton';
+import StartScreen from './components/StartScreen';
 import { useGameLoop } from './hooks/useGameLoop';
 import { useScreenMode } from './hooks/useScreenMode';
+import { generateSeed, normalizeSeed } from './seed';
 
 export default function App() {
+  const [started, setStarted] = useState(false);
   const [mapOpen, setMapOpen] = useState(false);
-  const { hud, canvasRef, miniMapRef, restartGame, setMovement } = useGameLoop(mapOpen);
-  const screen = useScreenMode(hud.gameOver, mapOpen, setMapOpen);
+  const [seed, setSeed] = useState(() => generateSeed());
+  const { hud, canvasRef, miniMapRef, restartGame, setMovement } = useGameLoop(mapOpen, started, seed);
+  const screen = useScreenMode(started, hud.gameOver, mapOpen, setMapOpen);
 
   useEffect(() => {
     if (screen.mode !== 'play') {
@@ -17,13 +21,27 @@ export default function App() {
     }
   }, [screen.mode, setMovement]);
 
+  useEffect(() => {
+    if (started) {
+      setSeed((current) => normalizeSeed(current));
+    }
+  }, [started]);
+
   return (
     <main className="app">
       <canvas ref={canvasRef} className="game-canvas" />
       <canvas ref={miniMapRef} className="mini-map" aria-hidden="true" />
 
-      <Hud hud={hud} />
-      {!screen.mapOpen ? (
+      {screen.mode !== 'start' ? <Hud hud={hud} /> : null}
+      {screen.mode === 'start' ? (
+        <StartScreen
+          seed={seed}
+          onSeedChange={(value) => setSeed(normalizeSeed(value))}
+          onRoll={() => setSeed(generateSeed())}
+          onStart={() => setStarted(true)}
+        />
+      ) : null}
+      {!screen.mapOpen && screen.mode === 'play' ? (
         <MapToggleButton open={screen.mapOpen} onToggle={screen.toggleMap} />
       ) : null}
 

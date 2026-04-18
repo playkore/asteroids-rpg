@@ -19,10 +19,10 @@ const INITIAL_HUD: HudState = {
   ready: false,
 };
 
-export function useGameLoop(paused: boolean) {
+export function useGameLoop(paused: boolean, started: boolean, seed: string) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const miniMapRef = useRef<HTMLCanvasElement | null>(null);
-  const gameRef = useRef(createGameState(360, 640));
+  const gameRef = useRef<ReturnType<typeof createGameState> | null>(null);
   const inputRef = useRef<InputState>(createInputState());
   const movementRef = useRef<JoystickVector>({
     x: 0,
@@ -35,7 +35,22 @@ export function useGameLoop(paused: boolean) {
   const lastFrameRef = useRef<number | null>(null);
   const [hud, setHud] = useState<HudState>(INITIAL_HUD);
 
+  const initializeGame = useCallback(() => {
+    gameRef.current = createGameState(window.innerWidth, window.innerHeight, seed);
+    setHud({
+      score: gameRef.current.score,
+      lives: gameRef.current.lives,
+      wave: gameRef.current.wave,
+      gameOver: gameRef.current.gameOver,
+      ready: !gameRef.current.gameOver && gameRef.current.ship.alive,
+    });
+  }, [seed]);
+
   const drawCurrentFrame = useCallback(() => {
+    if (!gameRef.current) {
+      return;
+    }
+
     const canvas = canvasRef.current;
     if (!canvas) {
       return;
@@ -74,6 +89,12 @@ export function useGameLoop(paused: boolean) {
   }, []);
 
   const restartGame = useCallback(() => {
+    if (!gameRef.current) {
+      initializeGame();
+      drawCurrentFrame();
+      return;
+    }
+
     resetGameState(gameRef.current);
     inputRef.current = createInputState();
     movementRef.current = { x: 0, y: 0, centerX: 0, centerY: 0, active: false };
@@ -86,7 +107,7 @@ export function useGameLoop(paused: boolean) {
       ready: !gameRef.current.gameOver && gameRef.current.ship.alive,
     });
     drawCurrentFrame();
-  }, [drawCurrentFrame]);
+  }, [drawCurrentFrame, initializeGame]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -102,7 +123,9 @@ export function useGameLoop(paused: boolean) {
       canvas.height = Math.floor(height * dpr);
       canvas.style.width = `${width}px`;
       canvas.style.height = `${height}px`;
-      resizeGameState(gameRef.current, width, height);
+      if (gameRef.current) {
+        resizeGameState(gameRef.current, width, height);
+      }
 
       const miniMapCanvas = miniMapRef.current;
       if (miniMapCanvas) {
@@ -148,7 +171,19 @@ export function useGameLoop(paused: boolean) {
   }, []);
 
   useEffect(() => {
-    if (paused || gameRef.current.gameOver) {
+    if (!started) {
+      gameRef.current = null;
+      lastFrameRef.current = null;
+      setHud(INITIAL_HUD);
+      drawCurrentFrame();
+      return;
+    }
+
+    if (!gameRef.current) {
+      initializeGame();
+    }
+
+    if (paused || gameRef.current?.gameOver) {
       lastFrameRef.current = null;
       drawCurrentFrame();
       return;
@@ -162,15 +197,15 @@ export function useGameLoop(paused: boolean) {
       const input = inputRef.current;
       input.moveX = movementRef.current.active ? movementRef.current.x : 0;
       input.moveY = movementRef.current.active ? movementRef.current.y : 0;
-      input.shootRequested = !gameRef.current.gameOver;
+      input.shootRequested = !gameRef.current?.gameOver;
       const flameVisible = movementRef.current.active || input.keyboard.up;
 
-      const nextHud = updateGame(gameRef.current, input, dt, now);
+      const nextHud = updateGame(gameRef.current!, input, dt, now);
       const canvas = canvasRef.current;
       if (canvas) {
         const ctx = canvas.getContext('2d');
         if (ctx) {
-          drawGame(ctx, gameRef.current, now, window.devicePixelRatio || 1, flameVisible);
+          drawGame(ctx, gameRef.current!, now, window.devicePixelRatio || 1, flameVisible);
         }
       }
 
@@ -180,7 +215,7 @@ export function useGameLoop(paused: boolean) {
         if (miniCtx) {
           drawMiniMap(
             miniCtx,
-            gameRef.current,
+            gameRef.current!,
             window.devicePixelRatio || 1,
             miniMapCanvas.clientWidth,
             miniMapCanvas.clientHeight,
@@ -202,7 +237,7 @@ export function useGameLoop(paused: boolean) {
         window.cancelAnimationFrame(rafRef.current);
       }
     };
-  }, [drawCurrentFrame, paused, hud.gameOver]);
+  }, [drawCurrentFrame, initializeGame, paused, started, hud.gameOver]);
 
   return {
     canvasRef,

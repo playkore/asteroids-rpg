@@ -1,4 +1,5 @@
 import { generateCave } from './cave';
+import { createSeededRandom, generateSeed } from './seed';
 
 export type Vector = {
   x: number;
@@ -35,6 +36,8 @@ export type Asteroid = {
 };
 
 export type GameState = {
+  seed: string;
+  random: () => number;
   ship: Ship;
   bullets: Bullet[];
   asteroids: Asteroid[];
@@ -124,9 +127,12 @@ export function createInputState(): InputState {
   };
 }
 
-export function createGameState(width: number, height: number): GameState {
-  const cave = generateCave();
+export function createGameState(width: number, height: number, seed = generateSeed()): GameState {
+  const random = createSeededRandom(seed);
+  const cave = generateCave(random);
   return {
+    seed,
+    random,
     ship: {
       x: 0,
       y: 0,
@@ -137,7 +143,7 @@ export function createGameState(width: number, height: number): GameState {
       alive: true,
     },
     bullets: [],
-    asteroids: spawnWave(1, cave),
+    asteroids: spawnWave(1, cave, random),
     cave,
     score: 0,
     lives: 3,
@@ -159,7 +165,7 @@ export function resizeGameState(state: GameState, width: number, height: number)
 export function restartGame(state: GameState) {
   releaseBullets(state.bullets);
   releaseAsteroids(state.asteroids);
-  const fresh = createGameState(state.width, state.height);
+  const fresh = createGameState(state.width, state.height, state.seed);
   Object.assign(state, fresh);
 }
 
@@ -284,7 +290,7 @@ export function updateGame(
 
   if (state.waveClearAt > 0 && now >= state.waveClearAt) {
     state.wave += 1;
-    state.asteroids = spawnWave(state.wave, state.cave);
+    state.asteroids = spawnWave(state.wave, state.cave, state.random);
     state.waveClearAt = 0;
     state.ship.invulnerableUntil = now + INVULNERABILITY_TIME;
   }
@@ -332,7 +338,7 @@ function resolveBulletHits(state: GameState) {
         state.score += asteroid.size * 100;
         if (asteroid.size > 1) {
           const nextSize = (asteroid.size - 1) as AsteroidSize;
-          const spread = Math.random() * Math.PI * 2;
+          const spread = state.random() * Math.PI * 2;
           const speed = ASTEROID_SPEED[nextSize];
           for (const direction of [-1, 1]) {
             const splitAsteroid = acquireAsteroid();
@@ -392,7 +398,7 @@ function isPointInPolygon(px: number, py: number, polygon: Vector[]) {
   return inside;
 }
 
-function spawnWave(wave: number, cave: Vector[]): Asteroid[] {
+function spawnWave(wave: number, cave: Vector[], random: () => number): Asteroid[] {
   const count = Math.min(4 + wave, 10);
   const asteroids: Asteroid[] = [];
   let attempts = 0;
@@ -402,8 +408,8 @@ function spawnWave(wave: number, cave: Vector[]): Asteroid[] {
     let y = 0;
     let valid = false;
     for (let tries = 0; tries < 200; tries += 1) {
-      const angle = Math.random() * Math.PI * 2;
-      const dist = 200 + Math.random() * 2500;
+      const angle = random() * Math.PI * 2;
+      const dist = 200 + random() * 2500;
       const testX = Math.cos(angle) * dist;
       const testY = Math.sin(angle) * dist;
       if (
@@ -421,8 +427,8 @@ function spawnWave(wave: number, cave: Vector[]): Asteroid[] {
       continue;
     }
 
-    const vxAngle = Math.random() * Math.PI * 2;
-    const size: AsteroidSize = Math.random() > 0.7 ? 2 : 3;
+    const vxAngle = random() * Math.PI * 2;
+    const size: AsteroidSize = random() > 0.7 ? 2 : 3;
     const speed = ASTEROID_SPEED[size] * (0.55 + wave * 0.03);
     const asteroid = acquireAsteroid();
     asteroid.x = x;

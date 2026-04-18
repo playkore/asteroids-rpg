@@ -1,5 +1,7 @@
 import type { Vector } from './game';
 
+type RandomFn = () => number;
+
 type Node = {
   id: number;
   x: number;
@@ -73,7 +75,7 @@ function getIntersection(
   };
 }
 
-export function generateCave(): Vector[] {
+export function generateCave(random: RandomFn = Math.random): Vector[] {
   const nodes: Node[] = [{ id: 0, x: 0, y: 0, edges: [] }];
   const pool: Node[] = [nodes[0]!];
   const boundary: Vector[] = [];
@@ -86,14 +88,14 @@ export function generateCave(): Vector[] {
   while (nodes.length < 50 && attempts < 2000) {
     attempts += 1;
     if (pool.length === 0) {
-      pool.push(nodes[Math.floor(Math.random() * nodes.length)]!);
+      pool.push(nodes[Math.floor(random() * nodes.length)]!);
     }
 
-    const poolIdx = Math.random() < 0.5 ? pool.length - 1 : Math.floor(Math.random() * pool.length);
+    const poolIdx = random() < 0.5 ? pool.length - 1 : Math.floor(random() * pool.length);
     const node = pool[poolIdx]!;
 
-    const theta = Math.random() * Math.PI * 2;
-    const length = 250 + Math.random() * 200;
+    const theta = random() * Math.PI * 2;
+    const length = 250 + random() * 200;
     const nx = node.x + Math.cos(theta) * length;
     const ny = node.y + Math.sin(theta) * length;
 
@@ -125,7 +127,7 @@ export function generateCave(): Vector[] {
       newNode.edges.push(node);
       nodes.push(newNode);
       pool.push(newNode);
-    } else if (Math.random() < 0.1 && pool.length > 5) {
+    } else if (random() < 0.1 && pool.length > 5) {
       pool.splice(poolIdx, 1);
     }
   }
