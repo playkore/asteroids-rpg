@@ -7,6 +7,9 @@ type AsteroidPoint = {
 };
 
 const ASTEROID_SHAPE_CACHE: Partial<Record<number, AsteroidPoint[]>> = {};
+const GRID_LINE_WIDTH = 1;
+const GRID_SPACING = 120;
+const GRID_COLOR = '#232a33';
 
 export function drawGame(
   ctx: CanvasRenderingContext2D,
@@ -26,6 +29,7 @@ export function drawGame(
 
   ctx.save();
   ctx.translate(-cameraX, -cameraY);
+  drawBackgroundGrid(ctx, cameraX, cameraY, width, height);
   drawCave(ctx, state.cave);
   drawAsteroids(ctx, state.asteroids);
   drawBullets(ctx, state.bullets);
@@ -83,6 +87,37 @@ function drawCave(ctx: CanvasRenderingContext2D, cave: { x: number; y: number }[
   ctx.closePath();
   ctx.strokeStyle = UI_LINE_COLOR;
   ctx.lineWidth = UI_LINE_WIDTH;
+  ctx.stroke();
+}
+
+function drawBackgroundGrid(
+  ctx: CanvasRenderingContext2D,
+  cameraX: number,
+  cameraY: number,
+  width: number,
+  height: number,
+) {
+  const left = cameraX - GRID_SPACING;
+  const top = cameraY - GRID_SPACING;
+  const right = cameraX + width + GRID_SPACING;
+  const bottom = cameraY + height + GRID_SPACING;
+  const startX = Math.floor(left / GRID_SPACING) * GRID_SPACING;
+  const startY = Math.floor(top / GRID_SPACING) * GRID_SPACING;
+
+  ctx.strokeStyle = GRID_COLOR;
+  ctx.lineWidth = GRID_LINE_WIDTH;
+  ctx.beginPath();
+
+  for (let x = startX; x <= right; x += GRID_SPACING) {
+    ctx.moveTo(x, top);
+    ctx.lineTo(x, bottom);
+  }
+
+  for (let y = startY; y <= bottom; y += GRID_SPACING) {
+    ctx.moveTo(left, y);
+    ctx.lineTo(right, y);
+  }
+
   ctx.stroke();
 }
 

@@ -5,7 +5,9 @@ import { UI_LINE_COLOR, UI_LINE_WIDTH } from '../src/constants';
 
 function createMockContext() {
   const arc = vi.fn();
-  return {
+  const lineWidths: number[] = [];
+  let currentLineWidth = 0;
+  const context = {
     setTransform: vi.fn(),
     clearRect: vi.fn(),
     fillRect: vi.fn(),
@@ -25,10 +27,20 @@ function createMockContext() {
     strokeRect: vi.fn(),
     fillStyle: '#000',
     strokeStyle: '#000',
-    lineWidth: 0,
     lineJoin: 'miter',
     lineCap: 'butt',
-  } as unknown as CanvasRenderingContext2D;
+    lineWidths,
+  } as CanvasRenderingContext2D & { lineWidths: number[] };
+
+  Object.defineProperty(context, 'lineWidth', {
+    get: () => currentLineWidth,
+    set: (value: number) => {
+      currentLineWidth = value;
+      lineWidths.push(value);
+    },
+    configurable: true,
+  });
+  return context;
 }
 
 describe('drawGame', () => {
@@ -60,6 +72,19 @@ describe('drawGame', () => {
     drawGame(ctx, state, 0, 1, false);
 
     expect(ctx.fillRect).toHaveBeenCalledTimes(1);
+  });
+
+  it('draws a thin background grid', () => {
+    const ctx = createMockContext();
+    const state = createGameState(320, 240);
+    state.ship.alive = false;
+    state.asteroids = [];
+    state.bullets = [];
+
+    drawGame(ctx, state, 0, 1, false);
+
+    expect(ctx.stroke).toHaveBeenCalledTimes(2);
+    expect((ctx as any).lineWidths).toContain(1);
   });
 
   it('centers the minimap on the ship', () => {
