@@ -8,7 +8,7 @@ import { useScreenMode } from './hooks/useScreenMode';
 
 export default function App() {
   const [mapOpen, setMapOpen] = useState(false);
-  const { hud, canvasRef, restartGame, setMovement } = useGameLoop(mapOpen);
+  const { hud, canvasRef, miniMapRef, restartGame, setMovement } = useGameLoop(mapOpen);
   const screen = useScreenMode(hud.gameOver, mapOpen, setMapOpen);
 
   useEffect(() => {
@@ -20,6 +20,7 @@ export default function App() {
   return (
     <main className="app">
       <canvas ref={canvasRef} className="game-canvas" />
+      <canvas ref={miniMapRef} className="mini-map" aria-hidden="true" />
 
       <Hud hud={hud} />
       {!screen.mapOpen ? (

@@ -8,7 +8,7 @@ import {
   type HudState,
   type InputState,
 } from '../game';
-import { drawGame } from '../renderer';
+import { drawGame, drawMiniMap } from '../renderer';
 import type { JoystickVector } from './useJoystickInput';
 
 const INITIAL_HUD: HudState = {
@@ -21,6 +21,7 @@ const INITIAL_HUD: HudState = {
 
 export function useGameLoop(paused: boolean) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const miniMapRef = useRef<HTMLCanvasElement | null>(null);
   const gameRef = useRef(createGameState(360, 640));
   const inputRef = useRef<InputState>(createInputState());
   const movementRef = useRef<JoystickVector>({
@@ -52,6 +53,20 @@ export function useGameLoop(paused: boolean) {
       window.devicePixelRatio || 1,
       movementRef.current.active || inputRef.current.keyboard.up,
     );
+
+    const miniMapCanvas = miniMapRef.current;
+    if (miniMapCanvas) {
+      const miniCtx = miniMapCanvas.getContext('2d');
+      if (miniCtx) {
+        drawMiniMap(
+          miniCtx,
+          gameRef.current,
+          window.devicePixelRatio || 1,
+          miniMapCanvas.clientWidth,
+          miniMapCanvas.clientHeight,
+        );
+      }
+    }
   }, []);
 
   const setMovement = useCallback((movement: JoystickVector) => {
@@ -88,6 +103,13 @@ export function useGameLoop(paused: boolean) {
       canvas.style.width = `${width}px`;
       canvas.style.height = `${height}px`;
       resizeGameState(gameRef.current, width, height);
+
+      const miniMapCanvas = miniMapRef.current;
+      if (miniMapCanvas) {
+        miniMapCanvas.width = Math.floor(miniMapCanvas.clientWidth * dpr);
+        miniMapCanvas.height = Math.floor(miniMapCanvas.clientHeight * dpr);
+      }
+
       drawCurrentFrame();
     };
 
@@ -152,6 +174,20 @@ export function useGameLoop(paused: boolean) {
         }
       }
 
+      const miniMapCanvas = miniMapRef.current;
+      if (miniMapCanvas) {
+        const miniCtx = miniMapCanvas.getContext('2d');
+        if (miniCtx) {
+          drawMiniMap(
+            miniCtx,
+            gameRef.current,
+            window.devicePixelRatio || 1,
+            miniMapCanvas.clientWidth,
+            miniMapCanvas.clientHeight,
+          );
+        }
+      }
+
       setHud(nextHud);
       if (!nextHud.gameOver) {
         rafRef.current = window.requestAnimationFrame(tick);
@@ -170,6 +206,7 @@ export function useGameLoop(paused: boolean) {
 
   return {
     canvasRef,
+    miniMapRef,
     hud,
     restartGame,
     setMovement,

@@ -33,6 +33,41 @@ export function drawGame(
   ctx.restore();
 }
 
+export function drawMiniMap(
+  ctx: CanvasRenderingContext2D,
+  state: GameState,
+  dpr: number,
+  width: number,
+  height: number,
+) {
+  const worldSpan = Math.max(state.width, state.height) * 5;
+  const padding = 12;
+  const scale = Math.min((width - padding * 2) / worldSpan, (height - padding * 2) / worldSpan);
+  const centerX = width / 2;
+  const centerY = height / 2;
+  const toMiniX = (value: number) => centerX + (value - state.ship.x) * scale;
+  const toMiniY = (value: number) => centerY + (value - state.ship.y) * scale;
+
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, width, height);
+  ctx.fillStyle = '#05070c';
+  ctx.fillRect(0, 0, width, height);
+  ctx.strokeStyle = UI_LINE_COLOR;
+  ctx.lineWidth = UI_LINE_WIDTH;
+  ctx.strokeRect(0, 0, width, height);
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(0, 0, width, height);
+  ctx.clip();
+
+  drawMiniMapCave(ctx, state.cave, toMiniX, toMiniY);
+  drawMiniMapAsteroids(ctx, state.asteroids, toMiniX, toMiniY);
+  drawMiniMapShip(ctx, centerX, centerY);
+
+  ctx.restore();
+}
+
 function drawCave(ctx: CanvasRenderingContext2D, cave: { x: number; y: number }[]) {
   if (cave.length === 0) {
     return;
@@ -106,6 +141,47 @@ function drawShip(ctx: CanvasRenderingContext2D, ship: Ship, flameVisible: boole
   }
   ctx.stroke();
   ctx.restore();
+}
+
+function drawMiniMapCave(
+  ctx: CanvasRenderingContext2D,
+  cave: { x: number; y: number }[],
+  toMiniX: (value: number) => number,
+  toMiniY: (value: number) => number,
+) {
+  if (cave.length === 0) {
+    return;
+  }
+
+  const first = cave[0]!;
+  ctx.beginPath();
+  ctx.moveTo(toMiniX(first.x), toMiniY(first.y));
+  for (let i = 1; i < cave.length; i += 1) {
+    const point = cave[i]!;
+    ctx.lineTo(toMiniX(point.x), toMiniY(point.y));
+  }
+  ctx.closePath();
+  ctx.stroke();
+}
+
+function drawMiniMapAsteroids(
+  ctx: CanvasRenderingContext2D,
+  asteroids: Asteroid[],
+  toMiniX: (value: number) => number,
+  toMiniY: (value: number) => number,
+) {
+  for (const asteroid of asteroids) {
+    ctx.beginPath();
+    ctx.arc(toMiniX(asteroid.x), toMiniY(asteroid.y), 2.5, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+}
+
+function drawMiniMapShip(ctx: CanvasRenderingContext2D, centerX: number, centerY: number) {
+  ctx.fillStyle = UI_LINE_COLOR;
+  ctx.beginPath();
+  ctx.arc(centerX, centerY, 2.5, 0, Math.PI * 2);
+  ctx.fill();
 }
 
 export function asteroidShape(radius: number) {

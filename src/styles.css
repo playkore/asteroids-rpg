@@ -48,6 +48,19 @@ button {
   display: block;
 }
 
+.mini-map {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  width: min(22vw, 160px);
+  height: min(22vw, 160px);
+  display: block;
+  background: #05070c;
+  border: var(--ui-line-width) solid var(--ui-line-color);
+  z-index: 3;
+  pointer-events: none;
+}
+
 .hud {
   position: absolute;
   top: max(env(safe-area-inset-top), 14px);
