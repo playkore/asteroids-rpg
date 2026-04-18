@@ -1,3 +1,5 @@
+import { generateCave } from './cave';
+
 export type Vector = {
   x: number;
   y: number;
@@ -36,6 +38,7 @@ export type GameState = {
   ship: Ship;
   bullets: Bullet[];
   asteroids: Asteroid[];
+  cave: Vector[];
   score: number;
   lives: number;
   wave: number;
@@ -123,8 +126,8 @@ export function createInputState(): InputState {
 export function createGameState(width: number, height: number): GameState {
   return {
     ship: {
-      x: width / 2,
-      y: height / 2,
+      x: 0,
+      y: 0,
       vx: 0,
       vy: 0,
       angle: -Math.PI / 2,
@@ -132,7 +135,8 @@ export function createGameState(width: number, height: number): GameState {
       alive: true,
     },
     bullets: [],
-    asteroids: spawnWave(width, height, 1),
+    asteroids: spawnWave(1),
+    cave: generateCave(2500, 300),
     score: 0,
     lives: 3,
     wave: 1,
@@ -148,13 +152,6 @@ export function createGameState(width: number, height: number): GameState {
 export function resizeGameState(state: GameState, width: number, height: number) {
   state.width = width;
   state.height = height;
-  if (state.ship.x === 0 && state.ship.y === 0) {
-    state.ship.x = width / 2;
-    state.ship.y = height / 2;
-  } else {
-    state.ship.x = wrap(state.ship.x, width);
-    state.ship.y = wrap(state.ship.y, height);
-  }
 }
 
 export function restartGame(state: GameState) {
@@ -213,12 +210,24 @@ export function updateGame(
     state.ship.vy += Math.sin(state.ship.angle) * accel * dt;
   }
 
+  const shipStartX = state.ship.x;
+  const shipStartY = state.ship.y;
   state.ship.vx *= SHIP_DRAG;
   state.ship.vy *= SHIP_DRAG;
-  state.ship.x = wrap(state.ship.x + state.ship.vx * dt, state.width);
-  state.ship.y = wrap(state.ship.y + state.ship.vy * dt, state.height);
+  state.ship.x += state.ship.vx * dt;
+  state.ship.y += state.ship.vy * dt;
 
-  if (state.ship.alive && now >= state.ship.invulnerableUntil) {
+  if (
+    state.ship.alive &&
+    now >= state.ship.invulnerableUntil &&
+    movementHitsCave(state.cave, shipStartX, shipStartY, state.ship.x, state.ship.y)
+  ) {
+    state.ship.x = shipStartX;
+    state.ship.y = shipStartY;
+    state.ship.vx = 0;
+    state.ship.vy = 0;
+    loseLife(state, now);
+  } else if (state.ship.alive && now >= state.ship.invulnerableUntil) {
     for (const asteroid of state.asteroids) {
       if (distanceSquared(state.ship.x, state.ship.y, asteroid.x, asteroid.y) < Math.pow(SHIP_RADIUS + asteroid.radius, 2)) {
         loseLife(state, now);
@@ -236,15 +245,23 @@ export function updateGame(
   input.keyboard.restart = false;
 
   for (const bullet of state.bullets) {
-    bullet.x = wrap(bullet.x + bullet.vx * dt, state.width);
-    bullet.y = wrap(bullet.y + bullet.vy * dt, state.height);
+    const bulletStartX = bullet.x;
+    const bulletStartY = bullet.y;
+    bullet.x += bullet.vx * dt;
+    bullet.y += bullet.vy * dt;
     bullet.life -= dt;
+    if (movementHitsCave(state.cave, bulletStartX, bulletStartY, bullet.x, bullet.y)) {
+      bullet.life = 0;
+    }
   }
   state.bullets = compactBullets(state.bullets);
 
   for (const asteroid of state.asteroids) {
-    asteroid.x = wrap(asteroid.x + asteroid.vx * dt, state.width);
-    asteroid.y = wrap(asteroid.y + asteroid.vy * dt, state.height);
+    const asteroidStartX = asteroid.x;
+    const asteroidStartY = asteroid.y;
+    asteroid.x += asteroid.vx * dt;
+    asteroid.y += asteroid.vy * dt;
+    bounceAsteroidOffCave(state.cave, asteroid, asteroidStartX, asteroidStartY);
   }
 
   resolveBulletHits(state);
@@ -265,7 +282,7 @@ export function updateGame(
 
   if (state.waveClearAt > 0 && now >= state.waveClearAt) {
     state.wave += 1;
-    state.asteroids = spawnWave(state.width, state.height, state.wave);
+    state.asteroids = spawnWave(state.wave);
     state.waveClearAt = 0;
     state.ship.invulnerableUntil = now + INVULNERABILITY_TIME;
   }
@@ -362,20 +379,20 @@ export function loseLife(state: GameState, now: number) {
   }
 }
 
-function spawnWave(width: number, height: number, wave: number): Asteroid[] {
+function spawnWave(wave: number): Asteroid[] {
   const count = Math.min(4 + wave, 10);
   const asteroids: Asteroid[] = [];
   for (let i = 0; i < count; i += 1) {
     const angle = Math.random() * Math.PI * 2;
-    const dist = Math.max(width, height) * (0.25 + Math.random() * 0.35);
-    const x = width / 2 + Math.cos(angle) * dist;
-    const y = height / 2 + Math.sin(angle) * dist;
+    const dist = 450 + Math.random() * 900;
+    const x = Math.cos(angle) * dist;
+    const y = Math.sin(angle) * dist;
     const vxAngle = Math.random() * Math.PI * 2;
     const size: AsteroidSize = Math.random() > 0.7 ? 2 : 3;
     const speed = ASTEROID_SPEED[size] * (0.55 + wave * 0.03);
     const asteroid = acquireAsteroid();
-    asteroid.x = wrap(x, width);
-    asteroid.y = wrap(y, height);
+    asteroid.x = x;
+    asteroid.y = y;
     asteroid.vx = Math.cos(vxAngle) * speed;
     asteroid.vy = Math.sin(vxAngle) * speed;
     asteroid.size = size;
@@ -429,6 +446,49 @@ function releaseAsteroids(asteroids: Asteroid[]) {
   }
 }
 
+function movementHitsCave(cave: Vector[], startX: number, startY: number, endX: number, endY: number) {
+  return findWallHit(cave, startX, startY, endX, endY) !== null;
+}
+
+function bounceAsteroidOffCave(cave: Vector[], asteroid: Asteroid, startX: number, startY: number) {
+  const hit = findWallHit(cave, startX, startY, asteroid.x, asteroid.y);
+  if (!hit) {
+    return;
+  }
+
+  const vx = asteroid.vx;
+  const vy = asteroid.vy;
+  const dot = vx * hit.nx + vy * hit.ny;
+  asteroid.vx = vx - 2 * dot * hit.nx;
+  asteroid.vy = vy - 2 * dot * hit.ny;
+  asteroid.x = startX + hit.nx * 2;
+  asteroid.y = startY + hit.ny * 2;
+}
+
+function findWallHit(cave: Vector[], startX: number, startY: number, endX: number, endY: number) {
+  for (let i = 0; i < cave.length; i += 1) {
+    const a = cave[i]!;
+    const b = cave[(i + 1) % cave.length]!;
+    if (!linesIntersect(startX, startY, endX, endY, a.x, a.y, b.x, b.y)) {
+      continue;
+    }
+
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const length = Math.hypot(dx, dy) || 1;
+    return {
+      ax: a.x,
+      ay: a.y,
+      bx: b.x,
+      by: b.y,
+      nx: (-dy / length),
+      ny: dx / length,
+    };
+  }
+
+  return null;
+}
+
 function asteroidShape(radius: number) {
   const segments = 9;
   return Array.from({ length: segments }, (_, index) => {
@@ -438,18 +498,47 @@ function asteroidShape(radius: number) {
   });
 }
 
-export function wrap(value: number, max: number) {
-  if (value < 0) return value + max;
-  if (value > max) return value - max;
-  return value;
-}
-
 function distanceSquared(ax: number, ay: number, bx: number, by: number) {
   const dx = ax - bx;
   const dy = ay - by;
   return dx * dx + dy * dy;
 }
 
+export function linesIntersect(
+  p1x: number,
+  p1y: number,
+  p2x: number,
+  p2y: number,
+  p3x: number,
+  p3y: number,
+  p4x: number,
+  p4y: number,
+) {
+  const d1 = direction(p3x, p3y, p4x, p4y, p1x, p1y);
+  const d2 = direction(p3x, p3y, p4x, p4y, p2x, p2y);
+  const d3 = direction(p1x, p1y, p2x, p2y, p3x, p3y);
+  const d4 = direction(p1x, p1y, p2x, p2y, p4x, p4y);
+
+  if (((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) && ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0))) {
+    return true;
+  }
+
+  if (d1 === 0 && onSegment(p3x, p3y, p4x, p4y, p1x, p1y)) return true;
+  if (d2 === 0 && onSegment(p3x, p3y, p4x, p4y, p2x, p2y)) return true;
+  if (d3 === 0 && onSegment(p1x, p1y, p2x, p2y, p3x, p3y)) return true;
+  if (d4 === 0 && onSegment(p1x, p1y, p2x, p2y, p4x, p4y)) return true;
+
+  return false;
+}
+
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
+}
+
+function direction(ax: number, ay: number, bx: number, by: number, cx: number, cy: number) {
+  return (cx - ax) * (by - ay) - (cy - ay) * (bx - ax);
+}
+
+function onSegment(ax: number, ay: number, bx: number, by: number, cx: number, cy: number) {
+  return Math.min(ax, bx) <= cx && cx <= Math.max(ax, bx) && Math.min(ay, by) <= cy && cy <= Math.max(ay, by);
 }

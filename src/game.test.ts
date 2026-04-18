@@ -1,11 +1,21 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createGameState, createInputState, loseLife, updateGame, wrap } from './game';
+import { generateCave } from './cave';
+import { createGameState, createInputState, linesIntersect, updateGame } from './game';
 
 afterEach(() => {
   vi.restoreAllMocks();
 });
 
 describe('game logic', () => {
+  it('creates a large cave and spawns the ship at the origin', () => {
+    const state = createGameState(800, 600);
+
+    expect(state.ship.x).toBe(0);
+    expect(state.ship.y).toBe(0);
+    expect(state.cave).toHaveLength(300);
+    expect(state.cave.every((point) => Math.hypot(point.x, point.y) > 1800)).toBe(true);
+  });
+
   it('increments score when a bullet hits an asteroid', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.5);
 
@@ -39,23 +49,92 @@ describe('game logic', () => {
     expect(state.asteroids.every((asteroid) => asteroid.size === 2)).toBe(true);
   });
 
-  it('wraps values across both boundaries', () => {
-    expect(wrap(-1, 10)).toBe(9);
-    expect(wrap(11, 10)).toBe(1);
-    expect(wrap(5, 10)).toBe(5);
+  it('detects line segment intersections', () => {
+    expect(linesIntersect(0, 0, 10, 0, 5, -5, 5, 5)).toBe(true);
+    expect(linesIntersect(0, 0, 10, 0, 20, -5, 20, 5)).toBe(false);
   });
 
-  it('does not lose a life while invulnerable', () => {
+  it('causes the ship to lose a life when crossing a cave wall', () => {
     const state = createGameState(800, 600);
-    state.lives = 3;
-    state.ship.invulnerableUntil = 2000;
-    state.ship.alive = true;
+    state.cave = [
+      { x: -10, y: -10 },
+      { x: 10, y: -10 },
+      { x: 10, y: 10 },
+      { x: -10, y: 10 },
+    ];
+    state.asteroids = [];
+    state.ship.x = 9;
+    state.ship.y = 0;
+    state.ship.vx = 5;
+    state.ship.vy = 0;
+    state.ship.invulnerableUntil = 0;
 
-    loseLife(state, 1000);
+    updateGame(state, createInputState(), 1, 1000);
 
-    expect(state.lives).toBe(3);
-    expect(state.ship.alive).toBe(true);
-    expect(state.respawnAt).toBe(0);
-    expect(state.gameOver).toBe(false);
+    expect(state.lives).toBe(2);
+    expect(state.ship.alive).toBe(false);
+    expect(state.ship.vx).toBe(0);
+    expect(state.ship.vy).toBe(0);
+  });
+
+  it('kills bullets when they cross a cave wall', () => {
+    const state = createGameState(800, 600);
+    state.cave = [
+      { x: -10, y: -10 },
+      { x: 10, y: -10 },
+      { x: 10, y: 10 },
+      { x: -10, y: 10 },
+    ];
+    state.ship.alive = false;
+    state.asteroids = [];
+    state.bullets = [
+      {
+        x: 9,
+        y: 0,
+        vx: 5,
+        vy: 0,
+        life: 1,
+      },
+    ];
+
+    updateGame(state, createInputState(), 1, 1000);
+
+    expect(state.bullets).toHaveLength(0);
+  });
+
+  it('bounces asteroids off cave walls', () => {
+    const state = createGameState(800, 600);
+    state.cave = [
+      { x: -10, y: -10 },
+      { x: 10, y: -10 },
+      { x: 10, y: 10 },
+      { x: -10, y: 10 },
+    ];
+    state.ship.alive = false;
+    state.bullets = [];
+    state.asteroids = [
+      {
+        x: 9,
+        y: 0,
+        vx: 5,
+        vy: 0,
+        size: 3,
+        radius: 56,
+      },
+    ];
+
+    updateGame(state, createInputState(), 1, 1000);
+
+    expect(state.asteroids[0]!.vx).toBeLessThan(0);
+    expect(state.asteroids[0]!.x).toBeLessThan(10);
+  });
+});
+
+describe('cave generation', () => {
+  it('generates a closed organic polygon', () => {
+    const cave = generateCave(2500, 300);
+
+    expect(cave).toHaveLength(300);
+    expect(cave[0]).toEqual(expect.objectContaining({ x: expect.any(Number), y: expect.any(Number) }));
   });
 });

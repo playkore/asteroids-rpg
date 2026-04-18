@@ -15,6 +15,7 @@ type Star = {
 };
 
 const ASTEROID_SHAPE_CACHE: Partial<Record<number, AsteroidPoint[]>> = {};
+const STARFIELD_SPAN = 6000;
 const STARFIELD = createStarfield();
 const BRIGHT_STARS = '#f4fbff';
 const DIM_STARS = '#7f8b98';
@@ -27,23 +28,37 @@ export function drawGame(
   flameVisible: boolean,
 ) {
   const { width, height } = state;
+  const cameraX = state.ship.x - width / 2;
+  const cameraY = state.ship.y - height / 2;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, width, height);
 
   ctx.fillStyle = '#05070c';
   ctx.fillRect(0, 0, width, height);
 
-  drawStarfield(ctx, width, height, now);
+  drawStarfield(ctx, width, height, now, cameraX, cameraY);
+
+  ctx.save();
+  ctx.translate(-cameraX, -cameraY);
+  drawCave(ctx, state.cave);
   drawAsteroids(ctx, state.asteroids);
   drawBullets(ctx, state.bullets);
   drawShip(ctx, state.ship, flameVisible);
+  ctx.restore();
 }
 
 export function getStarfield() {
   return STARFIELD;
 }
 
-function drawStarfield(ctx: CanvasRenderingContext2D, width: number, height: number, now: number) {
+function drawStarfield(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  now: number,
+  cameraX: number,
+  cameraY: number,
+) {
   const twinkleFrame = Math.floor(now / 180);
   for (const star of STARFIELD) {
     ctx.fillStyle =
@@ -52,8 +67,28 @@ function drawStarfield(ctx: CanvasRenderingContext2D, width: number, height: num
         : star.bright
           ? BRIGHT_STARS
           : DIM_STARS;
-    ctx.fillRect(star.x * width, star.y * height, star.size, star.size);
+    const x = mod(star.x - cameraX * 0.1, width);
+    const y = mod(star.y - cameraY * 0.1, height);
+    ctx.fillRect(x, y, star.size, star.size);
   }
+}
+
+function drawCave(ctx: CanvasRenderingContext2D, cave: { x: number; y: number }[]) {
+  if (cave.length === 0) {
+    return;
+  }
+
+  const first = cave[0]!;
+  ctx.strokeStyle = UI_LINE_COLOR;
+  ctx.lineWidth = UI_LINE_WIDTH;
+  ctx.beginPath();
+  ctx.moveTo(first.x, first.y);
+  for (let i = 1; i < cave.length; i += 1) {
+    const point = cave[i]!;
+    ctx.lineTo(point.x, point.y);
+  }
+  ctx.closePath();
+  ctx.stroke();
 }
 
 function drawAsteroids(ctx: CanvasRenderingContext2D, asteroids: Asteroid[]) {
@@ -134,9 +169,9 @@ function createStarfield() {
   let seed = 0x12345678;
   for (let i = 0; i < 80; i += 1) {
     seed = nextSeed(seed);
-    const x = seed / 0xffffffff;
+    const x = (seed / 0xffffffff) * STARFIELD_SPAN;
     seed = nextSeed(seed);
-    const y = seed / 0xffffffff;
+    const y = (seed / 0xffffffff) * STARFIELD_SPAN;
     stars.push({
       x,
       y,
@@ -150,4 +185,8 @@ function createStarfield() {
 
 function nextSeed(seed: number) {
   return (seed * 1664525 + 1013904223) >>> 0;
+}
+
+function mod(value: number, divisor: number) {
+  return ((value % divisor) + divisor) % divisor;
 }
