@@ -51,7 +51,7 @@ export function drawMiniMap(
   width: number,
   height: number,
 ) {
-  const worldSpan = Math.max(state.width, state.height) * 5;
+  const worldSpan = Math.max(state.width, state.height) * 2;
   const padding = 12;
   const scale = Math.min((width - padding * 2) / worldSpan, (height - padding * 2) / worldSpan);
   const centerX = width / 2;

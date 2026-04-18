@@ -145,6 +145,7 @@ describe('drawGame', () => {
     const secondX = (secondCtx as any).arc.mock.calls[0][0] as number;
 
     expect(secondX).toBeLessThan(firstX);
+    expect(firstX).toBeCloseTo(97, 0);
   });
 
   it('does not draw bullets on the minimap', () => {
