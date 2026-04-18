@@ -50,7 +50,7 @@ button {
   position: absolute;
   top: max(env(safe-area-inset-top), 14px);
   left: 12px;
-  right: 12px;
+  right: 76px;
   display: flex;
   gap: 10px;
   justify-content: space-between;
@@ -174,6 +174,40 @@ button {
   background: #05070c;
 }
 
+.map-toggle {
+  position: absolute;
+  top: max(env(safe-area-inset-top), 14px);
+  right: 14px;
+  width: 48px;
+  height: 48px;
+  border: 2px solid #c5cfda;
+  border-radius: 12px;
+  background: #090d13;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: auto;
+}
+
+.map-toggle__frame,
+.map-toggle__grid {
+  position: absolute;
+}
+
+.map-toggle__frame {
+  inset: 11px;
+  border: 2px solid #dce4ee;
+  border-radius: 7px;
+}
+
+.map-toggle__grid {
+  width: 18px;
+  height: 18px;
+  background:
+    linear-gradient(#dce4ee, #dce4ee) 50% 0 / 2px 100% no-repeat,
+    linear-gradient(#dce4ee, #dce4ee) 0 50% / 100% 2px no-repeat;
+}
+
 .overlay__panel {
   width: min(90vw, 360px);
   padding: 24px;
@@ -200,12 +234,41 @@ button {
   letter-spacing: 0.12em;
 }
 
+.map-overlay {
+  position: absolute;
+  inset: 0;
+  background: #05070c;
+  z-index: 3;
+}
+
+.map-overlay__close {
+  position: absolute;
+  top: max(env(safe-area-inset-top), 14px);
+  right: 14px;
+  border: 2px solid #c5cfda;
+  border-radius: 999px;
+  background: #090d13;
+  color: var(--text);
+  padding: 10px 16px;
+  letter-spacing: 0.12em;
+}
+
+.map {
+  position: absolute;
+  inset: 0;
+}
+
 @media (min-width: 768px) {
   .hud {
     left: 18px;
-    right: auto;
+    right: 90px;
     width: auto;
     gap: 12px;
+  }
+
+  .map-toggle,
+  .map-overlay__close {
+    right: 24px;
   }
 
   .fire {
