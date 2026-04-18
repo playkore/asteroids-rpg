@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import FloatingControls from './components/FloatingControls';
+import FrameRateBadge from './components/FrameRateBadge';
 import Hud from './components/Hud';
 import MapOverlay from './components/MapOverlay';
 import MapToggleButton from './components/MapToggleButton';
@@ -23,6 +24,7 @@ export default function App() {
       <canvas ref={miniMapRef} className="mini-map" aria-hidden="true" />
 
       <Hud hud={hud} />
+      <FrameRateBadge frameRate={hud.frameRate} />
       {!screen.mapOpen ? (
         <MapToggleButton open={screen.mapOpen} onToggle={screen.toggleMap} />
       ) : null}

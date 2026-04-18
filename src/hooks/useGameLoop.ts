@@ -8,6 +8,7 @@ import {
   type HudState,
   type InputState,
 } from '../game';
+import { estimateFrameRate } from '../performance';
 import { drawGame, drawMiniMap } from '../renderer';
 import type { JoystickVector } from './useJoystickInput';
 
@@ -15,6 +16,7 @@ const INITIAL_HUD: HudState = {
   score: 0,
   lives: 3,
   wave: 1,
+  frameRate: 0,
   gameOver: false,
   ready: false,
 };
@@ -82,6 +84,7 @@ export function useGameLoop(paused: boolean) {
       score: gameRef.current.score,
       lives: gameRef.current.lives,
       wave: gameRef.current.wave,
+      frameRate: 0,
       gameOver: gameRef.current.gameOver,
       ready: !gameRef.current.gameOver && gameRef.current.ship.alive,
     });
@@ -166,6 +169,7 @@ export function useGameLoop(paused: boolean) {
       const flameVisible = movementRef.current.active || input.keyboard.up;
 
       const nextHud = updateGame(gameRef.current, input, dt, now);
+      const frameRate = estimateFrameRate(dt);
       const canvas = canvasRef.current;
       if (canvas) {
         const ctx = canvas.getContext('2d');
@@ -188,7 +192,10 @@ export function useGameLoop(paused: boolean) {
         }
       }
 
-      setHud(nextHud);
+      setHud({
+        ...nextHud,
+        frameRate,
+      });
       if (!nextHud.gameOver) {
         rafRef.current = window.requestAnimationFrame(tick);
       } else {

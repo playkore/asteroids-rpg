@@ -238,7 +238,7 @@ export function generateCave(): Vector[] {
 
 export function isPointInsidePolygon(px: number, py: number, polygon: Vector[]) {
   let inside = false;
-  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i) {
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i, i += 1) {
     const current = polygon[i]!;
     const previous = polygon[j]!;
     const intersects =

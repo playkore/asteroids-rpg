@@ -70,6 +70,7 @@ export type HudState = {
   score: number;
   lives: number;
   wave: number;
+  frameRate: number;
   gameOver: boolean;
   ready: boolean;
 };
@@ -180,6 +181,7 @@ export function updateGame(
       score: state.score,
       lives: state.lives,
       wave: state.wave,
+      frameRate: 0,
       gameOver: true,
       ready: false,
     };
@@ -293,6 +295,7 @@ export function updateGame(
     score: state.score,
     lives: state.lives,
     wave: state.wave,
+    frameRate: 0,
     gameOver: state.gameOver,
     ready: !state.gameOver && state.ship.alive && now >= state.ship.invulnerableUntil,
   };
@@ -383,12 +386,11 @@ export function loseLife(state: GameState, now: number) {
 
 function isPointInPolygon(px: number, py: number, polygon: Vector[]) {
   let inside = false;
-  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i) {
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i, i += 1) {
     const pI = polygon[i]!;
     const pJ = polygon[j]!;
     const intersect = ((pI.y > py) !== (pJ.y > py)) && (px < (pJ.x - pI.x) * (py - pI.y) / (pJ.y - pI.y) + pI.x);
     if (intersect) inside = !inside;
-    i += 1;
   }
   return inside;
 }
