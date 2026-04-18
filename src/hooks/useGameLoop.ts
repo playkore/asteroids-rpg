@@ -2,13 +2,13 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   createGameState,
   createInputState,
-  drawGame,
   resizeGameState,
   restartGame as resetGameState,
   updateGame,
   type HudState,
   type InputState,
 } from '../game';
+import { drawGame } from '../renderer';
 import type { JoystickVector } from './useJoystickInput';
 
 const INITIAL_HUD: HudState = {

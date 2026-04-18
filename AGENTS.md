@@ -7,8 +7,6 @@
 - Avoid gradients, blur, backdrop filters, glow, or other soft translucent treatments.
 - Prefer solid dark backgrounds with light linework and a small, disciplined color palette.
 - Keep text in a thin monospaced style that matches the line weight of the game art as closely as possible.
-- The virtual joystick should appear only while the user is actively pressing or dragging on the play area.
-- The fire control should be icon-only and visually consistent with the rest of the line-art UI.
 - Keep any helper text to a minimum; remove instructional clutter when it competes with gameplay.
 - Every code change must be covered by unit tests, either by adding new tests or updating existing ones to match the changed behavior.
 
