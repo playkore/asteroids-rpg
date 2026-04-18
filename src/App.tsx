@@ -8,7 +8,7 @@ import { useScreenMode } from './hooks/useScreenMode';
 
 export default function App() {
   const [mapOpen, setMapOpen] = useState(false);
-  const { hud, canvasRef, restartGame, setMovement, beginFire, endFire } = useGameLoop(mapOpen);
+  const { hud, canvasRef, restartGame, setMovement } = useGameLoop(mapOpen);
   const screen = useScreenMode(hud.gameOver, mapOpen, setMapOpen);
 
   useEffect(() => {
@@ -42,8 +42,6 @@ export default function App() {
       <FloatingControls
         enabled={screen.mode === 'play'}
         onMovementChange={setMovement}
-        onFireStart={beginFire}
-        onFireEnd={endFire}
       />
     </main>
   );

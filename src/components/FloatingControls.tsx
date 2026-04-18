@@ -6,13 +6,9 @@ const JOYSTICK_RADIUS = 56;
 export default function FloatingControls({
   enabled,
   onMovementChange,
-  onFireStart,
-  onFireEnd,
 }: {
   enabled: boolean;
   onMovementChange: (movement: JoystickVector) => void;
-  onFireStart: () => void;
-  onFireEnd: () => void;
 }) {
   const { vector, bindings, reset } = useJoystickInput({
     enabled,
@@ -45,22 +41,10 @@ export default function FloatingControls({
               }
             : { display: 'none' }
         ) as CSSProperties}
-      >
+        >
         <span className="joystick__base" />
         <span className="joystick__knob" />
       </div>
-
-      <button
-        className="fire"
-        type="button"
-        onPointerDown={onFireStart}
-        onPointerUp={onFireEnd}
-        onPointerCancel={onFireEnd}
-        aria-label="Shoot"
-      >
-        <span className="fire__ring" />
-        <span className="fire__plus" />
-      </button>
     </div>
   );
 }

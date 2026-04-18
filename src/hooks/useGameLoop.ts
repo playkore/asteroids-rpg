@@ -140,6 +140,7 @@ export function useGameLoop(paused: boolean) {
       const input = inputRef.current;
       input.moveX = movementRef.current.active ? movementRef.current.x : 0;
       input.moveY = movementRef.current.active ? movementRef.current.y : 0;
+      input.shootRequested = !gameRef.current.gameOver;
       const flameVisible = movementRef.current.active || input.keyboard.up;
 
       const nextHud = updateGame(gameRef.current, input, dt, now);
@@ -152,7 +153,11 @@ export function useGameLoop(paused: boolean) {
       }
 
       setHud(nextHud);
-      rafRef.current = window.requestAnimationFrame(tick);
+      if (!nextHud.gameOver) {
+        rafRef.current = window.requestAnimationFrame(tick);
+      } else {
+        rafRef.current = null;
+      }
     };
 
     rafRef.current = window.requestAnimationFrame(tick);
@@ -163,21 +168,10 @@ export function useGameLoop(paused: boolean) {
     };
   }, [drawCurrentFrame, paused]);
 
-  const beginFire = useCallback(() => {
-    inputRef.current.shootRequested = true;
-    inputRef.current.shootHeld = true;
-  }, []);
-
-  const endFire = useCallback(() => {
-    inputRef.current.shootHeld = false;
-  }, []);
-
   return {
     canvasRef,
     hud,
     restartGame,
     setMovement,
-    beginFire,
-    endFire,
   };
 }
