@@ -87,6 +87,7 @@ export type Portal = {
   key: string;
   x: number;
   y: number;
+  spawnAnchor: Vector;
   targetSeed: string;
   kind: 'forward' | 'back';
 };
@@ -172,6 +173,7 @@ export function createGameState(
     key: deadEnd.key,
     x: deadEnd.x,
     y: deadEnd.y,
+    spawnAnchor: deadEnd.spawnAnchor,
     kind: index === backPortalIndex ? ('back' as const) : ('forward' as const),
     targetSeed:
       index === backPortalIndex
@@ -492,6 +494,14 @@ function travelThroughPortal(state: GameState, portal: Portal, now: number) {
   state.score = score;
   state.lives = lives;
   state.wave = 1;
+  const returnPortal = state.portals.find((candidate) => candidate.kind === 'back') ?? null;
+  if (returnPortal) {
+    state.ship.x = returnPortal.spawnAnchor.x;
+    state.ship.y = returnPortal.spawnAnchor.y;
+    state.ship.vx = 0;
+    state.ship.vy = 0;
+  }
+  state.ship.invulnerableUntil = now + INVULNERABILITY_TIME;
   state.portalCooldownUntil = now + 300;
 }
 

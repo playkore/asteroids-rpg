@@ -40,13 +40,13 @@ describe('game logic', () => {
     expect(state.seed).toBe(deriveSeed(rootSeed, forwardPortal.key));
     expect(state.parentSeed).toBe(rootSeed);
     expect(state.levelHistory).toHaveLength(1);
-    expect(state.portals.some((portal) => portal.kind === 'back')).toBe(true);
-
     const backPortal = state.portals.find((portal) => portal.kind === 'back');
     expect(backPortal).toBeTruthy();
     if (!backPortal) {
       return;
     }
+    expect(state.ship.x).toBeCloseTo(backPortal.spawnAnchor.x, 5);
+    expect(state.ship.y).toBeCloseTo(backPortal.spawnAnchor.y, 5);
 
     state.ship.x = backPortal.x;
     state.ship.y = backPortal.y;

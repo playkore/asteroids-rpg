@@ -16,6 +16,7 @@ export type CaveLayout = {
 
 export type CavePortal = Vector & {
   key: string;
+  spawnAnchor: Vector;
 };
 
 function distToSegment(
@@ -81,6 +82,31 @@ function getIntersection(
   return {
     x: line1Point.x + clampedT1 * line1Vector.x,
     y: line1Point.y + clampedT1 * line1Vector.y,
+  };
+}
+
+function getPortalSpawnAnchor(node: Node, boundary: Vector[]) {
+  const parent = node.edges[0]!;
+  const dx = parent.x - node.x;
+  const dy = parent.y - node.y;
+  const length = Math.hypot(dx, dy) || 1;
+  const stepX = dx / length;
+  const stepY = dy / length;
+  const offsets = [88, 72, 56, 40, 24];
+
+  for (const offset of offsets) {
+    const candidate = {
+      x: node.x + stepX * offset,
+      y: node.y + stepY * offset,
+    };
+    if (isPointInsidePolygon(candidate.x, candidate.y, boundary)) {
+      return candidate;
+    }
+  }
+
+  return {
+    x: node.x + stepX * offsets[offsets.length - 1]!,
+    y: node.y + stepY * offsets[offsets.length - 1]!,
   };
 }
 
@@ -249,7 +275,11 @@ export function generateCaveLayout(random: RandomFn = Math.random): CaveLayout {
 
   const deadEnds = nodes
     .filter((node) => node !== startNode && node.edges.length === 1)
-    .map((node) => ({ x: node.x, y: node.y }))
+    .map((node) => ({
+      x: node.x,
+      y: node.y,
+      spawnAnchor: getPortalSpawnAnchor(node, boundary),
+    }))
     .sort((a, b) => {
       const angleDiff = Math.atan2(a.y, a.x) - Math.atan2(b.y, b.x);
       if (Math.abs(angleDiff) > 0.0001) {
