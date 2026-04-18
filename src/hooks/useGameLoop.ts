@@ -7,6 +7,7 @@ import {
   updateGame,
   type HudState,
   type InputState,
+  type MapState,
 } from '../game';
 import { drawGame, drawMiniMap } from '../renderer';
 import type { JoystickVector } from './useJoystickInput';
@@ -35,6 +36,14 @@ export function useGameLoop(paused: boolean, started: boolean, seed: string) {
   const rafRef = useRef<number | null>(null);
   const lastFrameRef = useRef<number | null>(null);
   const [hud, setHud] = useState<HudState>(INITIAL_HUD);
+  const mapState: MapState | null = gameRef.current
+    ? {
+        rootSeed: gameRef.current.rootSeed,
+        currentNode: gameRef.current.currentNode,
+        nodeHistory: gameRef.current.nodeHistory,
+        graph: gameRef.current.graph,
+      }
+    : null;
 
   const initializeGame = useCallback(() => {
     gameRef.current = createGameState(window.innerWidth, window.innerHeight, seed);
@@ -246,6 +255,7 @@ export function useGameLoop(paused: boolean, started: boolean, seed: string) {
     canvasRef,
     miniMapRef,
     hud,
+    mapState,
     restartGame,
     setMovement,
   };

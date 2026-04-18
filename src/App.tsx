@@ -12,7 +12,11 @@ export default function App() {
   const [started, setStarted] = useState(false);
   const [mapOpen, setMapOpen] = useState(false);
   const [seed, setSeed] = useState(() => generateSeed());
-  const { hud, canvasRef, miniMapRef, restartGame, setMovement } = useGameLoop(mapOpen, started, seed);
+  const { hud, mapState, canvasRef, miniMapRef, restartGame, setMovement } = useGameLoop(
+    mapOpen,
+    started,
+    seed,
+  );
   const screen = useScreenMode(started, hud.gameOver, mapOpen, setMapOpen);
 
   useEffect(() => {
@@ -56,7 +60,7 @@ export default function App() {
         </div>
       ) : null}
 
-      {screen.mapOpen ? <MapOverlay onClose={screen.closeMap} /> : null}
+      {screen.mapOpen ? <MapOverlay mapState={mapState} onClose={screen.closeMap} /> : null}
 
       <FloatingControls
         enabled={screen.mode === 'play'}

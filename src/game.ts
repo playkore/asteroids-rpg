@@ -60,6 +60,8 @@ export type GameState = {
   portalCooldownUntil: number;
 };
 
+export type MapState = Pick<GameState, 'rootSeed' | 'currentNode' | 'nodeHistory' | 'graph'>;
+
 export type InputState = {
   moveX: number;
   moveY: number;
