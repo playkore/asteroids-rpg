@@ -166,7 +166,7 @@ export function useGameLoop(paused: boolean) {
         window.cancelAnimationFrame(rafRef.current);
       }
     };
-  }, [drawCurrentFrame, paused]);
+  }, [drawCurrentFrame, paused, hud.gameOver]);
 
   return {
     canvasRef,
