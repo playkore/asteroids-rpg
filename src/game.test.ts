@@ -166,6 +166,7 @@ describe('cave generation', () => {
 
     expect(isPointInsidePolygon(0, 0, square)).toBe(true);
     expect(isPointInsidePolygon(20, 0, square)).toBe(false);
+    expect(isPointInsidePolygon(-9, 9, square)).toBe(true);
   });
 
   it('generates a closed organic polygon', () => {
