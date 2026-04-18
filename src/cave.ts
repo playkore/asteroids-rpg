@@ -118,9 +118,10 @@ export function generateCaveLayout(random: RandomFn = Math.random): CaveLayout {
   let nextId = 1;
   const MIN_CLEARANCE = 240;
   const TUNNEL_RADIUS = 110;
+  const MAX_NODES = 10; // Defines the size of the cave
 
   let attempts = 0;
-  while (nodes.length < 50 && attempts < 2000) {
+  while (nodes.length < MAX_NODES && attempts < 2000) {
     attempts += 1;
     if (pool.length === 0) {
       pool.push(nodes[Math.floor(random() * nodes.length)]!);
