@@ -9,6 +9,11 @@ type Node = {
   edges: Node[];
 };
 
+export type CaveLayout = {
+  boundary: Vector[];
+  deadEnds: Vector[];
+};
+
 function distToSegment(
   px: number,
   py: number,
@@ -75,7 +80,7 @@ function getIntersection(
   };
 }
 
-export function generateCave(random: RandomFn = Math.random): Vector[] {
+export function generateCaveLayout(random: RandomFn = Math.random): CaveLayout {
   const nodes: Node[] = [{ id: 0, x: 0, y: 0, edges: [] }];
   const pool: Node[] = [nodes[0]!];
   const boundary: Vector[] = [];
@@ -147,7 +152,10 @@ export function generateCave(random: RandomFn = Math.random): Vector[] {
         y: Math.sin(angle) * TUNNEL_RADIUS,
       });
     }
-    return boundary;
+    return {
+      boundary,
+      deadEnds: [],
+    };
   }
 
   const path: Array<{ A: Node; B: Node }> = [];
@@ -235,7 +243,18 @@ export function generateCave(random: RandomFn = Math.random): Vector[] {
     }
   }
 
-  return boundary;
+  const deadEnds = nodes
+    .filter((node) => node !== startNode && node.edges.length === 1)
+    .map((node) => ({ x: node.x, y: node.y }));
+
+  return {
+    boundary,
+    deadEnds,
+  };
+}
+
+export function generateCave(random: RandomFn = Math.random): Vector[] {
+  return generateCaveLayout(random).boundary;
 }
 
 export function isPointInsidePolygon(px: number, py: number, polygon: Vector[]) {

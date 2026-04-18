@@ -1,4 +1,4 @@
-import { generateCave } from './cave';
+import { generateCaveLayout } from './cave';
 import { createSeededRandom, generateSeed } from './seed';
 
 export type Vector = {
@@ -42,6 +42,7 @@ export type GameState = {
   bullets: Bullet[];
   asteroids: Asteroid[];
   cave: Vector[];
+  deadEnds: Vector[];
   score: number;
   lives: number;
   wave: number;
@@ -129,7 +130,7 @@ export function createInputState(): InputState {
 
 export function createGameState(width: number, height: number, seed = generateSeed()): GameState {
   const random = createSeededRandom(seed);
-  const cave = generateCave(random);
+  const caveLayout = generateCaveLayout(random);
   return {
     seed,
     random,
@@ -143,8 +144,9 @@ export function createGameState(width: number, height: number, seed = generateSe
       alive: true,
     },
     bullets: [],
-    asteroids: spawnWave(1, cave, random),
-    cave,
+    asteroids: spawnWave(1, caveLayout.boundary, random),
+    cave: caveLayout.boundary,
+    deadEnds: caveLayout.deadEnds,
     score: 0,
     lives: 3,
     wave: 1,

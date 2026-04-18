@@ -49,6 +49,7 @@ describe('drawGame', () => {
     const state = createGameState(320, 240);
     state.asteroids = [];
     state.bullets = [];
+    state.deadEnds = [];
 
     drawGame(ctx, state, 0, 1, false);
 
@@ -68,6 +69,7 @@ describe('drawGame', () => {
     const state = createGameState(320, 240);
     state.asteroids = [];
     state.bullets = [];
+    state.deadEnds = [];
 
     drawGame(ctx, state, 0, 1, false);
 
@@ -89,6 +91,7 @@ describe('drawGame', () => {
       },
     ];
     state.bullets = [];
+    state.deadEnds = [];
 
     drawGame(ctx, state, 0, 1, false);
 
@@ -151,6 +154,24 @@ describe('drawGame', () => {
     ];
 
     drawMiniMap(ctx, state, 1, 160, 160);
+
+    expect((ctx as any).arc.mock.calls).toHaveLength(1);
+  });
+
+  it('draws dead-end circles on the main screen', () => {
+    const ctx = createMockContext();
+    const state = createGameState(320, 240);
+    state.cave = [
+      { x: -20, y: -20 },
+      { x: 20, y: -20 },
+      { x: 20, y: 20 },
+      { x: -20, y: 20 },
+    ];
+    state.deadEnds = [{ x: 10, y: 0 }];
+    state.asteroids = [];
+    state.bullets = [];
+
+    drawGame(ctx, state, 0, 1, false);
 
     expect((ctx as any).arc.mock.calls).toHaveLength(1);
   });

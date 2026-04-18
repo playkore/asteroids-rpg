@@ -15,6 +15,7 @@ describe('game logic', () => {
     expect(state.ship.y).toBe(0);
     expect(state.cave.length).toBeGreaterThan(100);
     expect(Math.max(...state.cave.map((point) => Math.hypot(point.x, point.y)))).toBeGreaterThan(500);
+    expect(state.deadEnds.length).toBeGreaterThan(0);
     expect(state.asteroids.every((asteroid) => Math.hypot(asteroid.x, asteroid.y) > 260)).toBe(true);
   });
 
