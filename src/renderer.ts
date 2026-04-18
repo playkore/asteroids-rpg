@@ -29,7 +29,13 @@ export function drawGame(
 
   ctx.save();
   ctx.translate(-cameraX, -cameraY);
+  beginCavePath(ctx, state.cave);
+  ctx.clip();
   drawBackgroundGrid(ctx, cameraX, cameraY, width, height);
+  ctx.restore();
+
+  ctx.save();
+  ctx.translate(-cameraX, -cameraY);
   drawCave(ctx, state.cave);
   drawAsteroids(ctx, state.asteroids);
   drawBullets(ctx, state.bullets);
@@ -73,6 +79,14 @@ export function drawMiniMap(
 }
 
 function drawCave(ctx: CanvasRenderingContext2D, cave: { x: number; y: number }[]) {
+  beginCavePath(ctx, cave);
+
+  ctx.strokeStyle = UI_LINE_COLOR;
+  ctx.lineWidth = UI_LINE_WIDTH;
+  ctx.stroke();
+}
+
+function beginCavePath(ctx: CanvasRenderingContext2D, cave: { x: number; y: number }[]) {
   if (cave.length === 0) {
     return;
   }
@@ -85,9 +99,6 @@ function drawCave(ctx: CanvasRenderingContext2D, cave: { x: number; y: number }[
     ctx.lineTo(point.x, point.y);
   }
   ctx.closePath();
-  ctx.strokeStyle = UI_LINE_COLOR;
-  ctx.lineWidth = UI_LINE_WIDTH;
-  ctx.stroke();
 }
 
 function drawBackgroundGrid(
@@ -123,19 +134,13 @@ function drawBackgroundGrid(
 
 function drawAsteroids(ctx: CanvasRenderingContext2D, asteroids: Asteroid[]) {
   for (const asteroid of asteroids) {
-    const points = asteroidShape(asteroid.radius);
     ctx.save();
     ctx.translate(asteroid.x, asteroid.y);
+    ctx.fillStyle = '#05070c';
+    beginAsteroidPath(ctx, asteroid);
+    ctx.fill();
     ctx.strokeStyle = UI_LINE_COLOR;
     ctx.lineWidth = UI_LINE_WIDTH;
-    ctx.beginPath();
-    points.forEach((point, index) => {
-      const px = Math.cos(point.angle) * asteroid.radius * point.distance;
-      const py = Math.sin(point.angle) * asteroid.radius * point.distance;
-      if (index === 0) ctx.moveTo(px, py);
-      else ctx.lineTo(px, py);
-    });
-    ctx.closePath();
     ctx.stroke();
     ctx.restore();
   }
@@ -210,6 +215,18 @@ function drawMiniMapAsteroids(
     ctx.arc(toMiniX(asteroid.x), toMiniY(asteroid.y), 2.5, 0, Math.PI * 2);
     ctx.stroke();
   }
+}
+
+function beginAsteroidPath(ctx: CanvasRenderingContext2D, asteroid: Asteroid) {
+  const points = asteroidShape(asteroid.radius);
+  ctx.beginPath();
+  points.forEach((point, index) => {
+    const px = Math.cos(point.angle) * asteroid.radius * point.distance;
+    const py = Math.sin(point.angle) * asteroid.radius * point.distance;
+    if (index === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  });
+  ctx.closePath();
 }
 
 function drawMiniMapShip(ctx: CanvasRenderingContext2D, centerX: number, centerY: number) {

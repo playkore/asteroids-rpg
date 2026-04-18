@@ -78,12 +78,23 @@ describe('drawGame', () => {
     const ctx = createMockContext();
     const state = createGameState(320, 240);
     state.ship.alive = false;
-    state.asteroids = [];
+    state.asteroids = [
+      {
+        x: 20,
+        y: 10,
+        vx: 0,
+        vy: 0,
+        size: 3,
+        radius: 56,
+      },
+    ];
     state.bullets = [];
 
     drawGame(ctx, state, 0, 1, false);
 
-    expect(ctx.stroke).toHaveBeenCalledTimes(2);
+    expect(ctx.clip).toHaveBeenCalledTimes(1);
+    expect(ctx.stroke).toHaveBeenCalledTimes(3);
+    expect(ctx.fill).toHaveBeenCalledTimes(1);
     expect((ctx as any).lineWidths).toContain(1);
   });
 
