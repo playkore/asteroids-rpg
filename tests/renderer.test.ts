@@ -88,6 +88,10 @@ describe('drawGame', () => {
         vy: 0,
         size: 3,
         radius: 56,
+        hp: 24,
+        maxHp: 24,
+        xpReward: 12,
+        contactDamage: 14,
       },
     ];
     state.bullets = [];
@@ -124,6 +128,10 @@ describe('drawGame', () => {
         vy: 0,
         size: 3,
         radius: 56,
+        hp: 24,
+        maxHp: 24,
+        xpReward: 12,
+        contactDamage: 14,
       },
     ];
 
@@ -150,6 +158,7 @@ describe('drawGame', () => {
         vx: 0,
         vy: 0,
         life: 1,
+        damage: 9,
       },
     ];
 

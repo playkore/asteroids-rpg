@@ -3,13 +3,17 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import Hud from '../src/components/Hud';
 
 describe('Hud', () => {
-  it('renders the active level seed as a copyable control', () => {
+  it('renders HP and XP progress bars with the active seed', () => {
     const markup = renderToStaticMarkup(
       <Hud
         hud={{
-          score: 1200,
-          lives: 3,
-          wave: 2,
+          player: {
+            level: 2,
+            xp: 18,
+            hp: 42,
+            maxHp: 74,
+            attack: 12,
+          },
           seed: 'CINDER-5D',
           gameOver: false,
           ready: true,
@@ -17,7 +21,12 @@ describe('Hud', () => {
       />,
     );
 
+    expect(markup).toContain('HP');
+    expect(markup).toContain('XP');
     expect(markup).toContain('Seed');
     expect(markup).toContain('CINDER-5D');
+    expect(markup).not.toContain('Score');
+    expect(markup).not.toContain('Lives');
+    expect(markup).not.toContain('Wave');
   });
 });

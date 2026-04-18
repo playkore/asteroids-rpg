@@ -9,7 +9,7 @@ afterEach(() => {
 });
 
 describe('game logic', () => {
-  it('creates a large maze cave and spawns the ship at the origin', () => {
+  it('creates a large maze cave and initializes RPG stats', () => {
     const state = createGameState(800, 600);
 
     expect(state.ship.x).toBe(0);
@@ -17,6 +17,13 @@ describe('game logic', () => {
     expect(state.currentNode.seed).toBe(state.seed);
     expect(state.currentNode.depth).toBe(0);
     expect(state.nodeHistory).toHaveLength(0);
+    expect(state.player).toEqual({
+      level: 1,
+      xp: 0,
+      hp: 60,
+      maxHp: 60,
+      attack: 9,
+    });
     expect(state.cave.length).toBeGreaterThan(100);
     expect(Math.max(...state.cave.map((point) => Math.hypot(point.x, point.y)))).toBeGreaterThan(500);
     expect(state.portals.length).toBeGreaterThan(0);
@@ -71,9 +78,7 @@ describe('game logic', () => {
     expect(state.ship.y).toBeCloseTo(returnPortal.spawnAnchor.y, 5);
   });
 
-  it('increments score when a bullet hits an asteroid', () => {
-    vi.spyOn(Math, 'random').mockReturnValue(0.5);
-
+  it('damages asteroids and awards xp when they are destroyed', () => {
     const state = createGameState(800, 600);
     state.ship.alive = false;
     state.asteroids = [
@@ -84,6 +89,10 @@ describe('game logic', () => {
         vy: 0,
         size: 3,
         radius: 56,
+        hp: 20,
+        maxHp: 20,
+        xpReward: 60,
+        contactDamage: 10,
       },
     ];
     state.bullets = [
@@ -93,15 +102,81 @@ describe('game logic', () => {
         vx: 0,
         vy: 0,
         life: 1,
+        damage: 20,
       },
     ];
 
     updateGame(state, createInputState(), 0, 1000);
 
-    expect(state.score).toBe(300);
+    expect(state.player.level).toBe(2);
+    expect(state.player.xp).toBe(12);
+    expect(state.player.maxHp).toBe(74);
+    expect(state.player.hp).toBe(74);
+    expect(state.player.attack).toBe(12);
     expect(state.bullets).toHaveLength(0);
-    expect(state.asteroids).toHaveLength(2);
-    expect(state.asteroids.every((asteroid) => asteroid.size === 2)).toBe(true);
+    expect(state.asteroids).toHaveLength(0);
+  });
+
+  it('reduces player hp when an asteroid touches the ship', () => {
+    const state = createGameState(800, 600);
+    state.ship.x = 240;
+    state.ship.y = 180;
+    state.ship.vx = 0;
+    state.ship.vy = 0;
+    state.ship.alive = true;
+    state.ship.invulnerableUntil = 0;
+    state.player.hp = 60;
+    state.asteroids = [
+      {
+        x: 240,
+        y: 180,
+        vx: 0,
+        vy: 0,
+        size: 3,
+        radius: 56,
+        hp: 24,
+        maxHp: 24,
+        xpReward: 12,
+        contactDamage: 10,
+      },
+    ];
+
+    updateGame(state, createInputState(), 0, 1000);
+
+    expect(state.player.hp).toBe(50);
+    expect(state.ship.alive).toBe(true);
+    expect(state.gameOver).toBe(false);
+  });
+
+  it('ends the run when player hp reaches zero', () => {
+    const state = createGameState(800, 600);
+    state.ship.x = 240;
+    state.ship.y = 180;
+    state.ship.vx = 0;
+    state.ship.vy = 0;
+    state.ship.alive = true;
+    state.ship.invulnerableUntil = 0;
+    state.player.hp = 8;
+    state.asteroids = [
+      {
+        x: 240,
+        y: 180,
+        vx: 0,
+        vy: 0,
+        size: 3,
+        radius: 56,
+        hp: 24,
+        maxHp: 24,
+        xpReward: 12,
+        contactDamage: 10,
+      },
+    ];
+
+    updateGame(state, createInputState(), 0, 1000);
+
+    expect(state.player.hp).toBe(0);
+    expect(state.ship.alive).toBe(false);
+    expect(state.gameOver).toBe(true);
   });
 
   it('detects line segment intersections', () => {
@@ -126,7 +201,7 @@ describe('game logic', () => {
 
     updateGame(state, createInputState(), 1, 1000);
 
-    expect(state.lives).toBe(3);
+    expect(state.player.hp).toBe(60);
     expect(state.ship.alive).toBe(true);
     expect(state.ship.vx).toBeLessThan(0);
     expect(state.ship.x).toBe(9);
@@ -149,6 +224,7 @@ describe('game logic', () => {
         vx: 5,
         vy: 0,
         life: 1,
+        damage: 0,
       },
     ];
 
@@ -175,6 +251,10 @@ describe('game logic', () => {
         vy: 0,
         size: 3,
         radius: 56,
+        hp: 24,
+        maxHp: 24,
+        xpReward: 12,
+        contactDamage: 10,
       },
     ];
 
@@ -184,26 +264,12 @@ describe('game logic', () => {
     expect(state.asteroids[0]!.x).toBeLessThan(10);
   });
 
-  it('respawns the ship at the cave origin', () => {
-    const state = createGameState(800, 600);
-    state.ship.alive = false;
-    state.ship.x = 120;
-    state.ship.y = 80;
-    state.respawnAt = 1000;
-
-    updateGame(state, createInputState(), 0, 1000);
-
-    expect(state.ship.alive).toBe(true);
-    expect(state.ship.x).toBe(0);
-    expect(state.ship.y).toBe(0);
-  });
-
   it('does not immediately hit the ship on a fresh update', () => {
     const state = createGameState(800, 600);
 
     updateGame(state, createInputState(), 0, 0);
 
-    expect(state.lives).toBe(3);
+    expect(state.player.hp).toBe(60);
     expect(state.ship.alive).toBe(true);
   });
 });

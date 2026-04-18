@@ -1,6 +1,7 @@
 import { generateCaveLayout } from './cave';
 import { LevelGraph, type LevelConnection, type LevelNode } from './levelGraph';
 import { createSeededRandom, generateSeed } from './seed';
+import { createPlayerStats, gainPlayerXp, type PlayerStats } from './rpg';
 
 export type Vector = {
   x: number;
@@ -23,6 +24,7 @@ export type Bullet = {
   vx: number;
   vy: number;
   life: number;
+  damage: number;
 };
 
 export type AsteroidSize = 3 | 2 | 1;
@@ -34,12 +36,15 @@ export type Asteroid = {
   vy: number;
   size: AsteroidSize;
   radius: number;
+  hp: number;
+  maxHp: number;
+  xpReward: number;
+  contactDamage: number;
 };
 
 export type GameState = {
   rootSeed: string;
   seed: string;
-  random: () => number;
   graph: LevelGraph;
   currentNode: LevelNode;
   nodeHistory: LevelNode[];
@@ -48,15 +53,11 @@ export type GameState = {
   asteroids: Asteroid[];
   cave: Vector[];
   portals: Portal[];
-  score: number;
-  lives: number;
-  wave: number;
+  player: PlayerStats;
   gameOver: boolean;
   width: number;
   height: number;
   nextShotAt: number;
-  respawnAt: number;
-  waveClearAt: number;
   portalCooldownUntil: number;
 };
 
@@ -79,9 +80,7 @@ export type InputState = {
 };
 
 export type HudState = {
-  score: number;
-  lives: number;
-  wave: number;
+  player: PlayerStats;
   seed: string;
   gameOver: boolean;
   ready: boolean;
@@ -109,8 +108,6 @@ const BULLET_SPEED = 560;
 const BULLET_LIFE = 1.05;
 const SHOOT_COOLDOWN = 0.18;
 const INVULNERABILITY_TIME = 2.2;
-const RESPAWN_DELAY = 1.1;
-const WAVE_DELAY = 1.3;
 const SPAWN_SAFE_RADIUS = 260;
 
 const ASTEROID_RADIUS: Record<AsteroidSize, number> = {
@@ -125,10 +122,27 @@ const ASTEROID_SPEED: Record<AsteroidSize, number> = {
   1: 122,
 };
 
+const ASTEROID_HP: Record<AsteroidSize, number> = {
+  3: 24,
+  2: 14,
+  1: 8,
+};
+
+const ASTEROID_XP_REWARD: Record<AsteroidSize, number> = {
+  3: 12,
+  2: 8,
+  1: 5,
+};
+
+const ASTEROID_CONTACT_DAMAGE: Record<AsteroidSize, number> = {
+  3: 14,
+  2: 9,
+  1: 5,
+};
+
 const bulletPool: Bullet[] = [];
 const asteroidPool: Asteroid[] = [];
 const bulletResolveBuffers: [Bullet[], Bullet[]] = [[], []];
-const asteroidResolveBuffers: [Asteroid[], Asteroid[]] = [[], []];
 let resolveBufferIndex = 0;
 
 export function createInputState(): InputState {
@@ -157,11 +171,10 @@ export function createGameState(
 ): GameState {
   const graph = options.graph ?? new LevelGraph();
   const rootNode = graph.createRoot(seed);
-  const level = generateLevel(rootNode, graph, 1);
+  const level = generateLevel(rootNode, graph);
   return {
     rootSeed: rootNode.seed,
     seed: rootNode.seed,
-    random: createSeededRandom(rootNode.seed),
     graph,
     currentNode: rootNode,
     nodeHistory: [],
@@ -178,20 +191,16 @@ export function createGameState(
     asteroids: level.asteroids,
     cave: level.cave,
     portals: level.portals,
-    score: 0,
-    lives: 3,
-    wave: 1,
+    player: createPlayerStats(),
     gameOver: false,
     width,
     height,
     nextShotAt: 0,
-    respawnAt: 0,
-    waveClearAt: 0,
     portalCooldownUntil: 0,
   };
 }
 
-function generateLevel(node: LevelNode, graph: LevelGraph, wave: number) {
+function generateLevel(node: LevelNode, graph: LevelGraph) {
   const random = createSeededRandom(node.seed);
   const caveLayout = generateCaveLayout(random);
   const connections = graph.listConnections(node);
@@ -200,8 +209,7 @@ function generateLevel(node: LevelNode, graph: LevelGraph, wave: number) {
   return {
     cave: caveLayout.boundary,
     portals,
-    asteroids: spawnWave(wave, caveLayout.boundary, random),
-    random,
+    asteroids: spawnAsteroids(node.depth, caveLayout.boundary, random),
   };
 }
 
@@ -252,9 +260,7 @@ export function updateGame(
 
   if (state.gameOver) {
     return {
-      score: state.score,
-      lives: state.lives,
-      wave: state.wave,
+      player: state.player,
       seed: state.seed,
       gameOver: true,
       ready: false,
@@ -308,10 +314,19 @@ export function updateGame(
   } else if (state.ship.alive && now >= state.ship.invulnerableUntil) {
     for (const asteroid of state.asteroids) {
       if (distanceSquared(state.ship.x, state.ship.y, asteroid.x, asteroid.y) < Math.pow(SHIP_RADIUS + asteroid.radius, 2)) {
-        loseLife(state, now);
+        damagePlayer(state, asteroid.contactDamage, now);
         break;
       }
     }
+  }
+
+  if (state.gameOver) {
+    return {
+      player: state.player,
+      seed: state.seed,
+      gameOver: true,
+      ready: false,
+    };
   }
 
   if (state.ship.alive && now >= state.portalCooldownUntil) {
@@ -319,9 +334,7 @@ export function updateGame(
     if (portal) {
       travelThroughPortal(state, portal, now);
       return {
-        score: state.score,
-        lives: state.lives,
-        wave: state.wave,
+        player: state.player,
         seed: state.seed,
         gameOver: state.gameOver,
         ready: !state.gameOver && state.ship.alive && now >= state.ship.invulnerableUntil,
@@ -359,31 +372,8 @@ export function updateGame(
 
   resolveBulletHits(state);
 
-  if (!state.ship.alive && state.respawnAt > 0 && now >= state.respawnAt) {
-    state.ship.x = 0;
-    state.ship.y = 0;
-    state.ship.vx = 0;
-    state.ship.vy = 0;
-    state.ship.alive = true;
-    state.ship.invulnerableUntil = now + INVULNERABILITY_TIME;
-    state.respawnAt = 0;
-  }
-
-  if (state.asteroids.length === 0 && state.waveClearAt === 0) {
-    state.waveClearAt = now + WAVE_DELAY;
-  }
-
-  if (state.waveClearAt > 0 && now >= state.waveClearAt) {
-    state.wave += 1;
-    state.asteroids = spawnWave(state.wave, state.cave, state.random);
-    state.waveClearAt = 0;
-    state.ship.invulnerableUntil = now + INVULNERABILITY_TIME;
-  }
-
   return {
-    score: state.score,
-    lives: state.lives,
-    wave: state.wave,
+    player: state.player,
     seed: state.seed,
     gameOver: state.gameOver,
     ready: !state.gameOver && state.ship.alive && now >= state.ship.invulnerableUntil,
@@ -402,6 +392,7 @@ function tryShoot(state: GameState, now: number) {
   bullet.vx = Math.cos(state.ship.angle) * BULLET_SPEED + state.ship.vx;
   bullet.vy = Math.sin(state.ship.angle) * BULLET_SPEED + state.ship.vy;
   bullet.life = BULLET_LIFE;
+  bullet.damage = state.player.attack;
   state.bullets.push(bullet);
   state.nextShotAt = now + SHOOT_COOLDOWN * 1000;
 }
@@ -409,9 +400,7 @@ function tryShoot(state: GameState, now: number) {
 function resolveBulletHits(state: GameState) {
   const nextIndex = resolveBufferIndex ^ 1;
   const remainingBullets = bulletResolveBuffers[nextIndex]!;
-  const remainingAsteroids = asteroidResolveBuffers[nextIndex]!;
   remainingBullets.length = 0;
-  remainingAsteroids.length = 0;
   const destroyed = new Set<Asteroid>();
 
   for (const bullet of state.bullets) {
@@ -420,22 +409,10 @@ function resolveBulletHits(state: GameState) {
       if (destroyed.has(asteroid)) continue;
       if (distanceSquared(bullet.x, bullet.y, asteroid.x, asteroid.y) <= asteroid.radius * asteroid.radius) {
         hit = true;
-        destroyed.add(asteroid);
-        state.score += asteroid.size * 100;
-        if (asteroid.size > 1) {
-          const nextSize = (asteroid.size - 1) as AsteroidSize;
-          const spread = state.random() * Math.PI * 2;
-          const speed = ASTEROID_SPEED[nextSize];
-          for (const direction of [-1, 1]) {
-            const splitAsteroid = acquireAsteroid();
-            splitAsteroid.x = asteroid.x;
-            splitAsteroid.y = asteroid.y;
-            splitAsteroid.vx = Math.cos(spread + direction * 0.7) * speed + asteroid.vx * 0.4;
-            splitAsteroid.vy = Math.sin(spread + direction * 0.7) * speed + asteroid.vy * 0.4;
-            splitAsteroid.size = nextSize;
-            splitAsteroid.radius = ASTEROID_RADIUS[nextSize];
-            remainingAsteroids.push(splitAsteroid);
-          }
+        asteroid.hp = Math.max(0, asteroid.hp - bullet.damage);
+        if (asteroid.hp <= 0) {
+          destroyed.add(asteroid);
+          gainPlayerXp(state.player, asteroid.xpReward);
         }
         break;
       }
@@ -447,16 +424,14 @@ function resolveBulletHits(state: GameState) {
     }
   }
 
-  for (const asteroid of state.asteroids) {
-    if (!destroyed.has(asteroid)) {
-      remainingAsteroids.push(asteroid);
-    } else {
-      releaseAsteroid(asteroid);
-    }
-  }
-
   state.bullets = remainingBullets;
-  state.asteroids = remainingAsteroids;
+  state.asteroids = state.asteroids.filter((asteroid) => {
+    if (!destroyed.has(asteroid)) {
+      return true;
+    }
+    releaseAsteroid(asteroid);
+    return false;
+  });
   resolveBufferIndex = nextIndex;
 }
 
@@ -475,9 +450,6 @@ function travelThroughPortal(state: GameState, portal: Portal, now: number) {
 
   const departedNode = state.currentNode;
   const nextNode = state.graph.followConnection(departedNode, portal.connection);
-  const score = state.score;
-  const lives = state.lives;
-  const wave = state.wave;
   let spawnPortalKey: string | null = null;
 
   if (portal.connection.kind === 'back') {
@@ -493,22 +465,16 @@ function travelThroughPortal(state: GameState, portal: Portal, now: number) {
     spawnPortalKey = null;
   }
 
-  const level = generateLevel(state.currentNode, state.graph, wave);
+  const level = generateLevel(state.currentNode, state.graph);
   state.seed = state.currentNode.seed;
-  state.random = createSeededRandom(state.currentNode.seed);
   state.cave = level.cave;
   state.portals = level.portals;
   state.asteroids = level.asteroids;
   state.bullets = [];
-  state.score = score;
-  state.lives = lives;
-  state.wave = wave;
   state.ship.alive = true;
   state.ship.vx = 0;
   state.ship.vy = 0;
   state.ship.invulnerableUntil = now + INVULNERABILITY_TIME;
-  state.respawnAt = 0;
-  state.waveClearAt = 0;
   state.nextShotAt = 0;
 
   const spawnPortal =
@@ -527,16 +493,17 @@ function travelThroughPortal(state: GameState, portal: Portal, now: number) {
   state.portalCooldownUntil = now + 300;
 }
 
-export function loseLife(state: GameState, now: number) {
-  if (now < state.ship.invulnerableUntil) {
+function damagePlayer(state: GameState, amount: number, now: number) {
+  if (now < state.ship.invulnerableUntil || !state.ship.alive) {
     return;
   }
-  state.lives -= 1;
-  state.ship.alive = false;
-  state.respawnAt = now + RESPAWN_DELAY;
-  state.ship.invulnerableUntil = now + RESPAWN_DELAY;
-  if (state.lives <= 0) {
+  state.player.hp = Math.max(0, state.player.hp - amount);
+  state.ship.invulnerableUntil = now + INVULNERABILITY_TIME;
+  if (state.player.hp <= 0) {
     state.gameOver = true;
+    state.ship.alive = false;
+    state.ship.vx = 0;
+    state.ship.vy = 0;
   }
 }
 
@@ -551,8 +518,8 @@ function isPointInPolygon(px: number, py: number, polygon: Vector[]) {
   return inside;
 }
 
-function spawnWave(wave: number, cave: Vector[], random: () => number): Asteroid[] {
-  const count = Math.min(4 + wave, 10);
+function spawnAsteroids(depth: number, cave: Vector[], random: () => number): Asteroid[] {
+  const count = Math.min(4 + Math.floor(depth / 2), 10);
   const asteroids: Asteroid[] = [];
   let attempts = 0;
   for (let i = 0; i < count && attempts < 5000; ) {
@@ -581,8 +548,9 @@ function spawnWave(wave: number, cave: Vector[], random: () => number): Asteroid
     }
 
     const vxAngle = random() * Math.PI * 2;
-    const size: AsteroidSize = random() > 0.7 ? 2 : 3;
-    const speed = ASTEROID_SPEED[size] * (0.55 + wave * 0.03);
+    const sizeRoll = random();
+    const size: AsteroidSize = depth >= 7 && sizeRoll > 0.6 ? 1 : sizeRoll > 0.7 ? 2 : 3;
+    const speed = ASTEROID_SPEED[size] * (0.75 + depth * 0.03);
     const asteroid = acquireAsteroid();
     asteroid.x = x;
     asteroid.y = y;
@@ -590,6 +558,10 @@ function spawnWave(wave: number, cave: Vector[], random: () => number): Asteroid
     asteroid.vy = Math.sin(vxAngle) * speed;
     asteroid.size = size;
     asteroid.radius = ASTEROID_RADIUS[size];
+    asteroid.maxHp = ASTEROID_HP[size] + depth * 2;
+    asteroid.hp = asteroid.maxHp;
+    asteroid.xpReward = ASTEROID_XP_REWARD[size] + depth * 2;
+    asteroid.contactDamage = ASTEROID_CONTACT_DAMAGE[size] + Math.floor(depth / 2);
     asteroids.push(asteroid);
     i += 1;
   }
@@ -612,7 +584,7 @@ function compactBullets(bullets: Bullet[]) {
 
 function acquireBullet() {
   const bullet = bulletPool.pop();
-  return bullet ?? { x: 0, y: 0, vx: 0, vy: 0, life: 0 };
+  return bullet ?? { x: 0, y: 0, vx: 0, vy: 0, life: 0, damage: 0 };
 }
 
 function releaseBullet(bullet: Bullet) {
@@ -627,7 +599,20 @@ function releaseBullets(bullets: Bullet[]) {
 
 function acquireAsteroid() {
   const asteroid = asteroidPool.pop();
-  return asteroid ?? { x: 0, y: 0, vx: 0, vy: 0, size: 3, radius: ASTEROID_RADIUS[3] };
+  return (
+    asteroid ?? {
+      x: 0,
+      y: 0,
+      vx: 0,
+      vy: 0,
+      size: 3,
+      radius: ASTEROID_RADIUS[3],
+      hp: ASTEROID_HP[3],
+      maxHp: ASTEROID_HP[3],
+      xpReward: ASTEROID_XP_REWARD[3],
+      contactDamage: ASTEROID_CONTACT_DAMAGE[3],
+    }
+  );
 }
 
 function releaseAsteroid(asteroid: Asteroid) {

@@ -69,6 +69,7 @@ button {
   display: flex;
   gap: 10px;
   justify-content: space-between;
+  align-items: stretch;
   pointer-events: none;
   z-index: 2;
 }
@@ -94,22 +95,59 @@ button {
 .hud__pill {
   min-width: 0;
   flex: 1;
-  max-width: 120px;
+  max-width: 180px;
   padding: 8px 10px;
   border-radius: 12px;
   border: var(--ui-line-width) solid var(--ui-line-color);
   background: #070a10;
 }
 
+.hud__pill--meter {
+  display: grid;
+  gap: 6px;
+}
+
 .hud__pill--seed {
-  max-width: 180px;
+  max-width: 240px;
+  color: var(--text);
+  text-align: left;
+  pointer-events: auto;
+}
+
+.hud__pill--seed span {
+  margin-bottom: 0;
+}
+
+.hud__seed-button {
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
   color: var(--text);
   text-align: left;
   cursor: pointer;
+  word-break: break-word;
 }
 
-.hud__pill--seed strong {
+.hud__seed-button:focus-visible {
+  outline: none;
+}
+
+.hud__pill--seed .hud__seed-button {
   word-break: break-word;
+}
+
+.hud__meter {
+  height: 12px;
+  border: var(--ui-line-width) solid var(--ui-line-color);
+  border-radius: 999px;
+  overflow: hidden;
+  background: #111720;
+}
+
+.hud__meter-fill {
+  height: 100%;
+  background: var(--ui-line-color);
 }
 
 .hud__pill span {
@@ -122,7 +160,7 @@ button {
 
 .hud__pill strong {
   display: block;
-  margin-top: 4px;
+  margin-top: 0;
   font-size: 1.08rem;
   line-height: 1;
   font-weight: 400;

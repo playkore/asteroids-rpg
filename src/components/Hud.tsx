@@ -1,6 +1,14 @@
 import type { HudState } from '../game';
+import { xpToNextLevel } from '../rpg';
 
-export default function Hud({ hud }: { hud: Pick<HudState, 'score' | 'lives' | 'wave' | 'seed'> }) {
+function progressWidth(current: number, max: number) {
+  if (max <= 0) {
+    return '0%';
+  }
+  return `${Math.max(0, Math.min(100, (current / max) * 100))}%`;
+}
+
+export default function Hud({ hud }: { hud: HudState }) {
   const copySeed = async () => {
     if (!navigator.clipboard?.writeText) {
       return;
@@ -8,24 +16,36 @@ export default function Hud({ hud }: { hud: Pick<HudState, 'score' | 'lives' | '
     await navigator.clipboard.writeText(hud.seed);
   };
 
+  const xpMax = xpToNextLevel(hud.player.level);
+
   return (
     <div className="hud">
-      <div className="hud__pill">
-        <span>Score</span>
-        <strong>{hud.score}</strong>
+      <div className="hud__pill hud__pill--meter">
+        <span>HP</span>
+        <div className="hud__meter">
+          <div className="hud__meter-fill" style={{ width: progressWidth(hud.player.hp, hud.player.maxHp) }} />
+        </div>
+        <strong>
+          {hud.player.hp} / {hud.player.maxHp}
+        </strong>
       </div>
-      <div className="hud__pill">
-        <span>Lives</span>
-        <strong>{hud.lives}</strong>
+      <div className="hud__pill hud__pill--meter">
+        <span>XP</span>
+        <div className="hud__meter">
+          <div className="hud__meter-fill" style={{ width: progressWidth(hud.player.xp, xpMax) }} />
+        </div>
+        <strong>
+          {hud.player.xp} / {xpMax}
+        </strong>
       </div>
-      <div className="hud__pill">
-        <span>Wave</span>
-        <strong>{hud.wave}</strong>
+      <div className="hud__pill hud__pill--seed">
+        <span>
+          Seed · Lv {hud.player.level} · ATK {hud.player.attack}
+        </span>
+        <button className="hud__seed-button" type="button" onClick={() => void copySeed()}>
+          {hud.seed}
+        </button>
       </div>
-      <button className="hud__pill hud__pill--seed" type="button" onClick={() => void copySeed()}>
-        <span>Seed</span>
-        <strong>{hud.seed}</strong>
-      </button>
     </div>
   );
 }
