@@ -1,4 +1,4 @@
-import CaveMap from './components/CaveMap';
+import CaveMap from '../features/cave-map/CaveMapPage';
 
 export default function App() {
   return (

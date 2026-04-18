@@ -1,4 +1,4 @@
-import type { HudState } from '../game';
+import type { HudState } from '../types';
 
 export default function Hud({ hud }: { hud: Pick<HudState, 'score' | 'lives' | 'wave'> }) {
   return (

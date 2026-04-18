@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
-import { generateCaveMap, isFloor } from '../cave';
-import { DEFAULT_CAVE_SEED, normalizeCaveSeed } from '../cave/seed';
-import { getPrototypeCaveDimensions, getSquareMapBounds } from '../cave/prototype';
+import { generateCaveMap, isFloor } from './cave';
+import { DEFAULT_CAVE_SEED, normalizeCaveSeed } from './cave/seed';
+import { getPrototypeCaveDimensions, getSquareMapBounds } from './cave/prototype';
 
 const { width: MAP_WIDTH, height: MAP_HEIGHT } = getPrototypeCaveDimensions();
 

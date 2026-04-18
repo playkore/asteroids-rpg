@@ -1,100 +1,28 @@
-export type Vector = {
-  x: number;
-  y: number;
-};
-
-export type Ship = {
-  x: number;
-  y: number;
-  vx: number;
-  vy: number;
-  angle: number;
-  invulnerableUntil: number;
-  alive: boolean;
-};
-
-export type Bullet = {
-  x: number;
-  y: number;
-  vx: number;
-  vy: number;
-  life: number;
-};
-
-export type AsteroidSize = 3 | 2 | 1;
-
-export type Asteroid = {
-  x: number;
-  y: number;
-  vx: number;
-  vy: number;
-  size: AsteroidSize;
-  radius: number;
-};
-
-export type GameState = {
-  ship: Ship;
-  bullets: Bullet[];
-  asteroids: Asteroid[];
-  score: number;
-  lives: number;
-  wave: number;
-  gameOver: boolean;
-  width: number;
-  height: number;
-  nextShotAt: number;
-  respawnAt: number;
-  waveClearAt: number;
-};
-
-export type InputState = {
-  moveX: number;
-  moveY: number;
-  shootHeld: boolean;
-  shootRequested: boolean;
-  pauseRequested: boolean;
-  keyboard: {
-    left: boolean;
-    right: boolean;
-    up: boolean;
-    down: boolean;
-    shoot: boolean;
-    restart: boolean;
-  };
-};
-
-export type HudState = {
-  score: number;
-  lives: number;
-  wave: number;
-  gameOver: boolean;
-  ready: boolean;
-};
-
-const SHIP_RADIUS = 12;
-const SHIP_DRAG = 0.992;
-const SHIP_MAX_SPEED = 260;
-const SHIP_JOYSTICK_RESPONSE = 0.2;
-const SHIP_KEYBOARD_ROTATION_SPEED = 4.2;
-const SHIP_KEYBOARD_THRUST = 240;
-const BULLET_SPEED = 560;
-const BULLET_LIFE = 1.05;
-const SHOOT_COOLDOWN = 0.18;
-const INVULNERABILITY_TIME = 2.2;
-const RESPAWN_DELAY = 1.1;
-const WAVE_DELAY = 1.3;
-
-const ASTEROID_RADIUS: Record<AsteroidSize, number> = {
-  3: 56,
-  2: 34,
-  1: 20,
-};
-
-const ASTEROID_SPEED: Record<AsteroidSize, number> = {
-  3: 62,
-  2: 92,
-  1: 122,
-};
+import {
+  ASTEROID_RADIUS,
+  ASTEROID_SPEED,
+  BULLET_LIFE,
+  BULLET_SPEED,
+  INVULNERABILITY_TIME,
+  RESPAWN_DELAY,
+  SHOOT_COOLDOWN,
+  SHIP_DRAG,
+  SHIP_JOYSTICK_RESPONSE,
+  SHIP_KEYBOARD_ROTATION_SPEED,
+  SHIP_KEYBOARD_THRUST,
+  SHIP_MAX_SPEED,
+  SHIP_RADIUS,
+  WAVE_DELAY,
+} from './constants';
+import type {
+  Asteroid,
+  AsteroidSize,
+  Bullet,
+  GameState,
+  HudState,
+  InputState,
+  Ship,
+} from './types';
 
 export function createInputState(): InputState {
   return {

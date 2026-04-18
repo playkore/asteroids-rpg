@@ -1,4 +1,4 @@
-import Map from '../Map';
+import CaveMap from '../CaveMapPage';
 
 export default function MapOverlay({ onClose }: { onClose: () => void }) {
   return (
@@ -6,7 +6,7 @@ export default function MapOverlay({ onClose }: { onClose: () => void }) {
       <button className="map-overlay__close" type="button" onClick={onClose}>
         Close
       </button>
-      <Map />
+      <CaveMap />
     </section>
   );
 }

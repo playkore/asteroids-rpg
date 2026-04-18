@@ -6,9 +6,8 @@ import {
   resizeGameState,
   restartGame as resetGameState,
   updateGame,
-  type HudState,
-  type InputState,
 } from '../game';
+import type { HudState, InputState } from '../types';
 import type { JoystickVector } from './useJoystickInput';
 
 const INITIAL_HUD: HudState = {
