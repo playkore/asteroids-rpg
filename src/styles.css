@@ -72,6 +72,10 @@ button {
   touch-action: none;
 }
 
+.controls-layer.is-disabled .controls-surface {
+  pointer-events: none;
+}
+
 .hud__pill {
   min-width: 0;
   flex: 1;
@@ -189,6 +193,8 @@ button {
   display: grid;
   place-items: center;
   background: #05070c;
+  z-index: 6;
+  pointer-events: auto;
 }
 
 .map-toggle {

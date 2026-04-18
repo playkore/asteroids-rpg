@@ -27,7 +27,7 @@ export default function FloatingControls({
   }, [enabled, reset]);
 
   return (
-    <div className="controls-layer" aria-hidden={!enabled}>
+    <div className={`controls-layer${enabled ? '' : ' is-disabled'}`} aria-hidden={!enabled}>
       <div className="controls-surface" {...bindings} />
 
       <div
