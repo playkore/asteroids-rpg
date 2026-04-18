@@ -22,8 +22,9 @@ type GraphLayout = {
 const NODE_RADIUS = 6;
 const CURRENT_NODE_RADIUS = 12;
 const ROOT_NODE_RADIUS = 7;
-const DEPTH_SPACING = 196;
-const LANE_SPACING = 92;
+const DEPTH_SPACING = 160;
+const LANE_SPACING = 72;
+const MIN_DEPTH_NODE_SPACING = 40;
 const SVG_MARGIN = 44;
 const FORWARD_CONNECTION_ORDER: Array<LevelConnection['kind']> = ['main', 'side', 'challenge', 'shortcut'];
 
@@ -160,29 +161,30 @@ export function buildGraphLayout(mapState: MapState): GraphLayout {
   const positioned = new Set<string>();
   const positionNode = (node: LayoutNode): number => {
     if (positioned.has(node.seed)) {
-      return node.y;
+      return node.x;
     }
 
     positioned.add(node.seed);
     const children = childMap.get(node.seed) ?? [];
     if (children.length === 0) {
-      node.x = (node.depth - mapState.currentNode.depth) * DEPTH_SPACING;
-      node.y = laneCursor.value * LANE_SPACING;
+      node.x = laneCursor.value * LANE_SPACING;
+      node.y = (node.depth - mapState.currentNode.depth) * DEPTH_SPACING;
       laneCursor.value += 1;
-      return node.y;
+      return node.x;
     }
 
-    const childYs = children.map((child: LevelNode) => {
+    const childXs = children.map((child: LevelNode) => {
       const layoutChild = nodeBySeed.get(child.seed);
       return layoutChild ? positionNode(layoutChild) : 0;
     });
 
-    node.x = (node.depth - mapState.currentNode.depth) * DEPTH_SPACING;
-    node.y = childYs.reduce((sum: number, value: number) => sum + value, 0) / childYs.length;
-    return node.y;
+    node.x = childXs.reduce((sum: number, value: number) => sum + value, 0) / childXs.length;
+    node.y = (node.depth - mapState.currentNode.depth) * DEPTH_SPACING;
+    return node.x;
   };
 
   positionNode(nodeBySeed.get(root.seed)!);
+  spreadNodesByDepth(nodes);
 
   const bounds = getBounds(nodes);
   const minX = bounds.minX - SVG_MARGIN;
@@ -190,14 +192,41 @@ export function buildGraphLayout(mapState: MapState): GraphLayout {
   const width = bounds.maxX - bounds.minX + SVG_MARGIN * 2;
   const height = bounds.maxY - bounds.minY + SVG_MARGIN * 2;
 
-  const maxDepthSeeds = nodes.filter((node) => node.depth === mapState.graph.maxDepth).map((node) => node.seed);
-  console.log('[map] max depth seeds', maxDepthSeeds);
-
   return {
     nodes,
     edges,
     viewBox: `${minX} ${minY} ${width} ${height}`,
   };
+}
+
+function spreadNodesByDepth(nodes: LayoutNode[]) {
+  const byDepth = new globalThis.Map<number, LayoutNode[]>();
+  for (const node of nodes) {
+    const layer = byDepth.get(node.depth) ?? [];
+    layer.push(node);
+    byDepth.set(node.depth, layer);
+  }
+
+  for (const layer of byDepth.values()) {
+    if (layer.length <= 1) {
+      continue;
+    }
+
+    layer.sort((left, right) => left.x - right.x || left.seed.localeCompare(right.seed));
+    const originalCenter = (layer[0]!.x + layer[layer.length - 1]!.x) / 2;
+
+    let cursor = layer[0]!.x;
+    for (let index = 1; index < layer.length; index += 1) {
+      cursor = Math.max(layer[index]!.x, cursor + MIN_DEPTH_NODE_SPACING);
+      layer[index]!.x = cursor;
+    }
+
+    const spreadCenter = (layer[0]!.x + layer[layer.length - 1]!.x) / 2;
+    const offset = originalCenter - spreadCenter;
+    for (const node of layer) {
+      node.x += offset;
+    }
+  }
 }
 
 function getBounds(nodes: LayoutNode[]) {

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import Map, { buildGraphLayout } from '../src/Map';
 import { createGameState } from '../src/game';
@@ -20,6 +20,7 @@ describe('Map', () => {
 
     expect(xRange).toBeGreaterThan(300);
     expect(yRange).toBeGreaterThan(300);
+    expect(yRange).toBeGreaterThan(xRange);
     expect(new Set(layout.nodes.map((node) => Math.round(node.y))).size).toBeGreaterThan(3);
     expect(Math.max(...layout.nodes.map((node) => node.depth))).toBe(game.graph.maxDepth);
 
@@ -29,19 +30,28 @@ describe('Map', () => {
     expect(viewHeight).toBeGreaterThan(yRange);
   });
 
-  it('logs the max depth seed list', () => {
+  it('keeps nodes on the same depth separated', () => {
     const game = createGameState(800, 600, 'CINDER-5D');
-    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
-
-    buildGraphLayout({
+    const layout = buildGraphLayout({
       rootSeed: game.rootSeed,
       currentNode: game.currentNode,
       nodeHistory: game.nodeHistory,
       graph: game.graph,
     });
 
-    const maxDepthLog = log.mock.calls.find((call) => call[0] === '[map] max depth seeds');
-    expect(maxDepthLog?.[1]).toHaveLength(12);
+    const byDepth = new globalThis.Map<number, number[]>();
+    for (const node of layout.nodes) {
+      const xs = byDepth.get(node.depth) ?? [];
+      xs.push(node.x);
+      byDepth.set(node.depth, xs);
+    }
+
+    for (const xs of byDepth.values()) {
+      xs.sort((left, right) => left - right);
+      for (let index = 1; index < xs.length; index += 1) {
+        expect(xs[index]! - xs[index - 1]!).toBeGreaterThanOrEqual(40);
+      }
+    }
   });
 
   it('renders the graph and marks the current level', () => {
