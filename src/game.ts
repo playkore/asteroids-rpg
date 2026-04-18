@@ -333,7 +333,7 @@ function resolveBulletHits(state: GameState) {
   state.asteroids = remainingAsteroids;
 }
 
-function loseLife(state: GameState, now: number) {
+export function loseLife(state: GameState, now: number) {
   if (now < state.ship.invulnerableUntil) {
     return;
   }
@@ -378,7 +378,7 @@ function asteroidShape(radius: number) {
   });
 }
 
-function wrap(value: number, max: number) {
+export function wrap(value: number, max: number) {
   if (value < 0) return value + max;
   if (value > max) return value - max;
   return value;
