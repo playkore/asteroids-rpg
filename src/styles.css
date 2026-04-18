@@ -84,6 +84,56 @@ button {
   letter-spacing: 0.08em;
 }
 
+.cave-map__seed-form {
+  display: grid;
+  gap: 6px;
+  margin-top: 8px;
+  pointer-events: auto;
+}
+
+.cave-map__seed-label {
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.22em;
+  color: var(--muted);
+}
+
+.cave-map__seed-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.cave-map__seed-input {
+  min-width: 0;
+  flex: 1;
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 2px solid #303844;
+  background: #090d13;
+  color: var(--text);
+  outline: none;
+  pointer-events: auto;
+}
+
+.cave-map__seed-input:focus {
+  border-color: #c5cfda;
+}
+
+.cave-map__seed-button {
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 2px solid #c5cfda;
+  background: #090d13;
+  color: var(--text);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  pointer-events: auto;
+  cursor: pointer;
+}
+
 .cave-map__badge em {
   margin-top: 4px;
   font-style: normal;

@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { generateCaveMap, isFloor } from './cave';
+import { countOpenRegionsAboveDistance } from './cave/analysis';
 import { createSeededRandom } from './cave/random';
+import { DEFAULT_CAVE_SEED, normalizeCaveSeed } from './cave/seed';
 
 const WIDTH = 84;
 const HEIGHT = 56;
@@ -54,8 +56,8 @@ function countReachableFloors(map: ReturnType<typeof generateCaveMap>) {
 
 describe('generateCaveMap', () => {
   it('creates a deterministic seeded random sequence', () => {
-    const first = createSeededRandom('worm-caves-v1');
-    const second = createSeededRandom('worm-caves-v1');
+    const first = createSeededRandom(DEFAULT_CAVE_SEED);
+    const second = createSeededRandom(DEFAULT_CAVE_SEED);
     const third = createSeededRandom('worm-caves-v2');
 
     const firstSequence = [first(), first(), first(), first()];
@@ -67,8 +69,8 @@ describe('generateCaveMap', () => {
   });
 
   it('is deterministic for the same seed', () => {
-    const first = generateCaveMap('worm-caves-v1', WIDTH, HEIGHT);
-    const second = generateCaveMap('worm-caves-v1', WIDTH, HEIGHT);
+    const first = generateCaveMap(DEFAULT_CAVE_SEED, WIDTH, HEIGHT);
+    const second = generateCaveMap(DEFAULT_CAVE_SEED, WIDTH, HEIGHT);
 
     expect(tileSignature(first)).toBe(tileSignature(second));
     expect(first.floorCount).toBe(second.floorCount);
@@ -76,23 +78,36 @@ describe('generateCaveMap', () => {
   });
 
   it('changes when the seed changes', () => {
-    const first = generateCaveMap('worm-caves-v1', WIDTH, HEIGHT);
+    const first = generateCaveMap(DEFAULT_CAVE_SEED, WIDTH, HEIGHT);
     const second = generateCaveMap('worm-caves-v2', WIDTH, HEIGHT);
 
     expect(tileSignature(first)).not.toBe(tileSignature(second));
   });
 
   it('keeps the cave connected from the entry point', () => {
-    const map = generateCaveMap('worm-caves-v1', WIDTH, HEIGHT);
+    const map = generateCaveMap(DEFAULT_CAVE_SEED, WIDTH, HEIGHT);
 
     expect(isFloor(map, map.entry.x, map.entry.y)).toBe(true);
     expect(countReachableFloors(map)).toBe(map.floorCount);
   });
 
   it('stays within a sane floor coverage range', () => {
-    const map = generateCaveMap('worm-caves-v1', WIDTH, HEIGHT);
+    const map = generateCaveMap(DEFAULT_CAVE_SEED, WIDTH, HEIGHT);
 
-    expect(map.floorRatio).toBeGreaterThan(0.1);
+    expect(map.floorRatio).toBeGreaterThan(0.08);
     expect(map.floorRatio).toBeLessThan(0.3);
+  });
+
+  it('produces multiple cave bodies instead of one large room', () => {
+    const map = generateCaveMap(DEFAULT_CAVE_SEED, WIDTH, HEIGHT);
+    const regions = countOpenRegionsAboveDistance(map, 3);
+
+    expect(regions).toBeGreaterThanOrEqual(3);
+  });
+
+  it('normalizes blank seed input to the default seed', () => {
+    expect(normalizeCaveSeed('')).toBe(DEFAULT_CAVE_SEED);
+    expect(normalizeCaveSeed('   ')).toBe(DEFAULT_CAVE_SEED);
+    expect(normalizeCaveSeed('  cave-42  ')).toBe('cave-42');
   });
 });

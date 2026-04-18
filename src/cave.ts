@@ -4,23 +4,16 @@ export { DIRECTIONS, isFloor } from './cave/grid';
 import {
   carveBrush,
   clamp,
-  countFloorNeighbors,
   findNearestFloor,
-  pickFrontierCell,
-  type Direction,
-  DIRECTIONS,
   type CaveMap,
   type Point,
 } from './cave/grid';
 import { createSeededRandom } from './cave/random';
 
-type Worm = {
+type Chamber = {
   x: number;
   y: number;
-  direction: Direction;
-  steps: number;
-  thickness: number;
-  stallCount: number;
+  radius: number;
 };
 
 export function generateCaveMap(seed: string, width: number, height: number): CaveMap {
@@ -31,98 +24,17 @@ export function generateCaveMap(seed: string, width: number, height: number): Ca
   const floorCells: Point[] = [];
   const centerX = Math.floor(width / 2);
   const centerY = Math.floor(height / 2);
+  const chambers = createChambers(width, height, random);
 
-  let floorCount = carveBrush(tiles, width, height, centerX, centerY, 1, floorCells);
-  const targetFloor = Math.floor(width * height * (0.18 + random() * 0.04));
-
-  const worms: Worm[] = [];
-  const seedWorms = 4 + Math.floor(random() * 2);
-  for (let i = 0; i < seedWorms; i += 1) {
-    const anchor = pickFrontierCell(floorCells, tiles, width, height, random) ?? {
-      x: centerX,
-      y: centerY,
-    };
-    worms.push({
-      x: anchor.x,
-      y: anchor.y,
-      direction: ((i + Math.floor(random() * 2)) % 4) as Direction,
-      steps: Math.floor(width * 0.55 + random() * width * 0.4),
-      thickness: 1,
-      stallCount: 0,
-    });
+  let floorCount = 0;
+  for (const chamber of chambers) {
+    floorCount += carveChamber(tiles, width, height, chamber, floorCells, random);
   }
 
-  let safety = 0;
-  const safetyLimit = width * height * 32;
+  connectChambers(tiles, width, height, chambers, floorCells, random);
+  floorCount = floorCells.length;
 
-  while ((worms.length > 0 || floorCount < targetFloor) && safety < safetyLimit) {
-    safety += 1;
-
-    if (worms.length === 0) {
-      const anchor = pickFrontierCell(floorCells, tiles, width, height, random);
-      if (!anchor) {
-        break;
-      }
-
-      worms.push({
-        x: anchor.x,
-        y: anchor.y,
-        direction: Math.floor(random() * 4) as Direction,
-        steps: Math.floor(width * 0.35 + random() * width * 0.4),
-        thickness: 1,
-        stallCount: 0,
-      });
-    }
-
-    const worm = worms.pop()!;
-    let x = worm.x;
-    let y = worm.y;
-    let direction = worm.direction;
-    let stallCount = worm.stallCount;
-
-    for (let step = 0; step < worm.steps && floorCount < targetFloor; step += 1) {
-      const brushRadius = worm.thickness;
-      floorCount += carveBrush(tiles, width, height, x, y, brushRadius, floorCells);
-
-      if (step % 18 === 0 && random() < 0.2) {
-        worms.push({
-          x,
-          y,
-          direction: turnDirection(direction, random),
-          steps: Math.max(12, Math.floor(worm.steps * (0.35 + random() * 0.25))),
-          thickness: 1,
-          stallCount: 0,
-        });
-      }
-
-      if (step % 28 === 0 && random() < 0.08 && countFloorNeighbors(tiles, width, height, x, y) <= 1) {
-        floorCount += carveBrush(tiles, width, height, x, y, 2, floorCells);
-      }
-
-      const next = chooseNextStep(tiles, width, height, x, y, direction, random);
-      if (!next) {
-        break;
-      }
-
-      direction = next.direction;
-      const nextX = next.x;
-      const nextY = next.y;
-
-      if (tiles[nextY * width + nextX] === 0) {
-        stallCount += 1;
-        if (stallCount >= 3) {
-          break;
-        }
-      } else {
-        stallCount = 0;
-      }
-
-      x = nextX;
-      y = nextY;
-    }
-  }
-
-  const entry = findNearestFloor(tiles, width, height, centerX, centerY) ?? {
+  const entry = findNearestFloor(tiles, width, height, centerX, centerY) ?? chambers[0] ?? {
     x: centerX,
     y: centerY,
   };
@@ -138,101 +50,252 @@ export function generateCaveMap(seed: string, width: number, height: number): Ca
   };
 }
 
-function chooseNextStep(
+function createChambers(width: number, height: number, random: () => number) {
+  const count = 7 + Math.floor(random() * 2);
+  const centerX = Math.floor(width / 2);
+  const centerY = Math.floor(height / 2);
+  const minDistance = Math.max(10, Math.floor(Math.min(width, height) * 0.14));
+  const chambers: Chamber[] = [];
+  let attempts = 0;
+
+  chambers.push({
+    x: centerX,
+    y: centerY,
+    radius: 4 + Math.floor(random() * 2),
+  });
+
+  while (chambers.length < count && attempts < count * 80) {
+    attempts += 1;
+    const radius = 3 + Math.floor(random() * 3);
+    const x = clamp(Math.round(width * (0.16 + random() * 0.68)), 4, width - 5);
+    const y = clamp(Math.round(height * (0.16 + random() * 0.68)), 4, height - 5);
+
+    let valid = true;
+    for (const chamber of chambers) {
+      const dx = chamber.x - x;
+      const dy = chamber.y - y;
+      const distance = Math.hypot(dx, dy);
+      if (distance < minDistance + chamber.radius + radius) {
+        valid = false;
+        break;
+      }
+    }
+
+    if (!valid) {
+      continue;
+    }
+
+    chambers.push({ x, y, radius });
+  }
+
+  return chambers;
+}
+
+function carveChamber(
   tiles: Uint8Array,
   width: number,
   height: number,
-  x: number,
-  y: number,
-  direction: Direction,
+  chamber: Chamber,
+  floorCells: Point[],
   random: () => number,
 ) {
-  const candidates = ([0, 1, 2, 3] as Direction[])
-    .map((nextDirection) => {
-      const delta = DIRECTIONS[nextDirection];
-      const nextX = x + delta.x;
-      const nextY = y + delta.y;
+  let carved = 0;
+  carved += carveBrush(tiles, width, height, chamber.x, chamber.y, chamber.radius, floorCells);
 
-      if (nextX < 1 || nextY < 1 || nextX >= width - 1 || nextY >= height - 1) {
-        return null;
-      }
-
-      const index = nextY * width + nextX;
-      const isSolid = tiles[index] === 1;
-      const floorNeighbors = countFloorNeighbors(tiles, width, height, nextX, nextY);
-      const solidNeighbors = 4 - floorNeighbors;
-
-      let score = 0;
-
-      if (isSolid) {
-        score += 26;
-      } else {
-        score -= 100;
-      }
-
-      if (nextDirection === direction) {
-        score += 4;
-      } else if (nextDirection === oppositeDirection(direction)) {
-        score -= 8;
-      } else {
-        score += 1;
-      }
-
-      if (isSolid) {
-        if (floorNeighbors === 0) score += 6;
-        if (floorNeighbors === 1) score += 2;
-        if (floorNeighbors === 2) score -= 10;
-        if (floorNeighbors >= 3) score -= 30;
-        if (solidNeighbors <= 1) score -= 2;
-        if (solidNeighbors >= 3) score += 1;
-      } else {
-        score -= floorNeighbors * 4;
-      }
-
-      score += random() * 0.85;
-
-      return {
-        direction: nextDirection,
-        x: nextX,
-        y: nextY,
-        score,
-        isSolid,
-      };
-    })
-    .filter((candidate): candidate is NonNullable<typeof candidate> => candidate !== null)
-    .sort((a, b) => b.score - a.score);
-
-  if (candidates.length === 0) {
-    return null;
+  const satelliteCount = 1 + Math.floor(random() * 2);
+  for (let i = 0; i < satelliteCount; i += 1) {
+    const angle = random() * Math.PI * 2;
+    const offset = chamber.radius + 1 + Math.floor(random() * 2);
+    carved += carveBrush(
+      tiles,
+      width,
+      height,
+      chamber.x + Math.round(Math.cos(angle) * offset * 0.7),
+      chamber.y + Math.round(Math.sin(angle) * offset * 0.7),
+      1 + Math.floor(random() * 2),
+      floorCells,
+    );
   }
 
-  const solidCandidates = candidates.filter((candidate) => candidate.isSolid);
-  if (solidCandidates.length > 0) {
-    const filtered = solidCandidates.filter((candidate) => countFloorNeighbors(tiles, width, height, candidate.x, candidate.y) <= 1);
-    if (filtered.length > 0) {
-      return filtered[0];
+  return carved;
+}
+
+function connectChambers(
+  tiles: Uint8Array,
+  width: number,
+  height: number,
+  chambers: Chamber[],
+  floorCells: Point[],
+  random: () => number,
+) {
+  if (chambers.length <= 1) {
+    return;
+  }
+
+  const connected = new Set<number>();
+  connected.add(0);
+
+  while (connected.size < chambers.length) {
+    let bestFrom = 0;
+    let bestTo = 0;
+    let bestDistance = Number.POSITIVE_INFINITY;
+
+    for (const fromIndex of connected) {
+      const from = chambers[fromIndex]!;
+      for (let toIndex = 0; toIndex < chambers.length; toIndex += 1) {
+        if (connected.has(toIndex)) {
+          continue;
+        }
+        const to = chambers[toIndex]!;
+        const distance = distanceSquared(from.x, from.y, to.x, to.y) + random() * 0.001;
+        if (distance < bestDistance) {
+          bestDistance = distance;
+          bestFrom = fromIndex;
+          bestTo = toIndex;
+        }
+      }
     }
-    return solidCandidates[0];
+
+    carveTunnel(
+      tiles,
+      width,
+      height,
+      chambers[bestFrom]!,
+      chambers[bestTo]!,
+      floorCells,
+    );
+    connected.add(bestTo);
+  }
+}
+
+function carveTunnel(
+  tiles: Uint8Array,
+  width: number,
+  height: number,
+  start: Chamber,
+  target: Chamber,
+  floorCells: Point[],
+) {
+  const path = findTunnelPath(tiles, width, height, start, target);
+  if (path.length === 0) {
+    carveBrush(tiles, width, height, target.x, target.y, target.radius + 1, floorCells);
+    return;
   }
 
-  return null;
+  for (const point of path) {
+    carveBrush(tiles, width, height, point.x, point.y, 1, floorCells);
+  }
+
+  carveBrush(tiles, width, height, target.x, target.y, target.radius + 1, floorCells);
 }
 
-function turnDirection(direction: Direction, random: () => number) {
-  const roll = random();
-  if (roll < 0.33) return turnLeft(direction);
-  if (roll < 0.66) return turnRight(direction);
-  return oppositeDirection(direction);
+function distanceSquared(ax: number, ay: number, bx: number, by: number) {
+  const dx = ax - bx;
+  const dy = ay - by;
+  return dx * dx + dy * dy;
 }
 
-function turnLeft(direction: Direction) {
-  return ((direction + 3) % 4) as Direction;
+function findTunnelPath(
+  tiles: Uint8Array,
+  width: number,
+  height: number,
+  start: Chamber,
+  target: Chamber,
+) {
+  const startIndex = start.y * width + start.x;
+  const targetIndex = target.y * width + target.x;
+  const size = width * height;
+  const distances = new Float64Array(size);
+  distances.fill(Number.POSITIVE_INFINITY);
+  const previous = new Int32Array(size);
+  previous.fill(-1);
+  const open: number[] = [startIndex];
+  const inOpen = new Uint8Array(size);
+  inOpen[startIndex] = 1;
+  distances[startIndex] = 0;
+
+  while (open.length > 0) {
+    let bestOpenIndex = 0;
+    let bestIndex = open[0]!;
+    let bestDistance = distances[bestIndex] ?? Number.POSITIVE_INFINITY;
+    for (let i = 1; i < open.length; i += 1) {
+      const candidateIndex = open[i]!;
+      const candidateDistance = distances[candidateIndex] ?? Number.POSITIVE_INFINITY;
+      if (candidateDistance < bestDistance) {
+        bestDistance = candidateDistance;
+        bestIndex = candidateIndex;
+        bestOpenIndex = i;
+      }
+    }
+
+    open.splice(bestOpenIndex, 1);
+    inOpen[bestIndex] = 0;
+
+    if (bestIndex === targetIndex) {
+      break;
+    }
+
+    const x = bestIndex % width;
+    const y = Math.floor(bestIndex / width);
+    for (const neighbor of [
+      { x: x + 1, y },
+      { x: x - 1, y },
+      { x, y: y + 1 },
+      { x, y: y - 1 },
+    ]) {
+      if (neighbor.x < 1 || neighbor.y < 1 || neighbor.x >= width - 1 || neighbor.y >= height - 1) {
+        continue;
+      }
+
+      const neighborIndex = neighbor.y * width + neighbor.x;
+      const terrainCost = tiles[neighborIndex] === 1 ? 1 : 14;
+      const newDistance = (distances[bestIndex] ?? Number.POSITIVE_INFINITY) + terrainCost;
+      const existingDistance = distances[neighborIndex] ?? Number.POSITIVE_INFINITY;
+      if (newDistance >= existingDistance) {
+        continue;
+      }
+
+      distances[neighborIndex] = newDistance;
+      previous[neighborIndex] = bestIndex;
+      if (!inOpen[neighborIndex]) {
+        open.push(neighborIndex);
+        inOpen[neighborIndex] = 1;
+      }
+    }
+  }
+
+  if (!Number.isFinite(distances[targetIndex])) {
+    return carveFallbackTunnel(width, start, target);
+  }
+
+  const path: Point[] = [];
+  let cursor = targetIndex;
+  while (cursor !== -1 && cursor !== startIndex) {
+    path.push({
+      x: cursor % width,
+      y: Math.floor(cursor / width),
+    });
+    cursor = previous[cursor] ?? -1;
+  }
+
+  path.reverse();
+  return path;
 }
 
-function turnRight(direction: Direction) {
-  return ((direction + 1) % 4) as Direction;
-}
-
-function oppositeDirection(direction: Direction) {
-  return ((direction + 2) % 4) as Direction;
+function carveFallbackTunnel(width: number, start: Chamber, target: Chamber) {
+  const path: Point[] = [];
+  let x = start.x;
+  let y = start.y;
+  while (x !== target.x || y !== target.y) {
+    if (x !== target.x) {
+      x += x < target.x ? 1 : -1;
+    } else if (y !== target.y) {
+      y += y < target.y ? 1 : -1;
+    }
+    path.push({ x, y });
+    if (path.length > width * 2) {
+      break;
+    }
+  }
+  return path;
 }

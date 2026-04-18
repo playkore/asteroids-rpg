@@ -1,14 +1,16 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { generateCaveMap, isFloor } from '../cave';
+import { DEFAULT_CAVE_SEED, normalizeCaveSeed } from '../cave/seed';
+import { getPrototypeCaveDimensions, getSquareMapBounds } from '../cave/prototype';
 
-const SEED = 'worm-caves-v1';
-const MAP_WIDTH = 84;
-const MAP_HEIGHT = 56;
-
-const CAVE_MAP = generateCaveMap(SEED, MAP_WIDTH, MAP_HEIGHT);
+const { width: MAP_WIDTH, height: MAP_HEIGHT } = getPrototypeCaveDimensions();
 
 export default function CaveMap() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [draftSeed, setDraftSeed] = useState(DEFAULT_CAVE_SEED);
+  const [seed, setSeed] = useState(DEFAULT_CAVE_SEED);
+
+  const caveMap = useMemo(() => generateCaveMap(seed, MAP_WIDTH, MAP_HEIGHT), [seed]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -31,7 +33,7 @@ export default function CaveMap() {
         return;
       }
 
-      drawCaveMap(ctx, CAVE_MAP, width, height, dpr);
+      drawCaveMap(ctx, caveMap, width, height, dpr);
     };
 
     render();
@@ -39,37 +41,58 @@ export default function CaveMap() {
     return () => {
       window.removeEventListener('resize', render);
     };
-  }, []);
+  }, [caveMap]);
 
   const stats = useMemo(
-    () => `${CAVE_MAP.width} x ${CAVE_MAP.height} • ${Math.round(CAVE_MAP.floorRatio * 100)}% floor`,
-    [],
+    () => `${caveMap.width} x ${caveMap.height} • ${Math.round(caveMap.floorRatio * 100)}% floor`,
+    [caveMap],
   );
+
+  function applySeed(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSeed(normalizeCaveSeed(draftSeed));
+  }
 
   return (
     <section className="cave-map" aria-label="Seeded worm cave map">
       <canvas ref={canvasRef} className="cave-map__canvas" />
       <div className="cave-map__badge">
         <span>Worm cave prototype</span>
-        <strong>{SEED}</strong>
+        <form className="cave-map__seed-form" onSubmit={applySeed}>
+          <label className="cave-map__seed-label" htmlFor="cave-seed">
+            Seed
+          </label>
+          <div className="cave-map__seed-row">
+            <input
+              id="cave-seed"
+              className="cave-map__seed-input"
+              type="text"
+              value={draftSeed}
+              onChange={(event) => setDraftSeed(event.target.value)}
+              spellCheck={false}
+              autoCapitalize="none"
+              autoComplete="off"
+              autoCorrect="off"
+            />
+            <button className="cave-map__seed-button" type="submit">
+              Generate
+            </button>
+          </div>
+        </form>
+        <strong>{caveMap.seed}</strong>
         <em>{stats}</em>
       </div>
     </section>
   );
 }
 
-function drawCaveMap(
-  ctx: CanvasRenderingContext2D,
-  map: typeof CAVE_MAP,
-  viewWidth: number,
-  viewHeight: number,
-  dpr: number,
-) {
-  const cellSize = Math.max(4, Math.floor(Math.min(viewWidth / map.width, viewHeight / map.height)));
+function drawCaveMap(ctx: CanvasRenderingContext2D, map: ReturnType<typeof generateCaveMap>, viewWidth: number, viewHeight: number, dpr: number) {
+  const bounds = getSquareMapBounds(viewWidth, viewHeight);
+  const cellSize = Math.max(4, Math.floor(bounds.size / Math.max(map.width, map.height)));
   const mapPixelWidth = map.width * cellSize;
   const mapPixelHeight = map.height * cellSize;
-  const offsetX = Math.floor((viewWidth - mapPixelWidth) / 2);
-  const offsetY = Math.floor((viewHeight - mapPixelHeight) / 2);
+  const offsetX = bounds.offsetX + Math.floor((bounds.size - mapPixelWidth) / 2);
+  const offsetY = bounds.offsetY + Math.floor((bounds.size - mapPixelHeight) / 2);
   const edgeLine = Math.max(1.5, Math.min(3, cellSize * 0.16));
 
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
