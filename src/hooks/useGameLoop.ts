@@ -45,7 +45,13 @@ export function useGameLoop(paused: boolean) {
       return;
     }
 
-    drawGame(ctx, gameRef.current, performance.now(), window.devicePixelRatio || 1, movementRef.current.active);
+    drawGame(
+      ctx,
+      gameRef.current,
+      performance.now(),
+      window.devicePixelRatio || 1,
+      movementRef.current.active || inputRef.current.keyboard.up,
+    );
   }, []);
 
   const setMovement = useCallback((movement: JoystickVector) => {
@@ -134,13 +140,14 @@ export function useGameLoop(paused: boolean) {
       const input = inputRef.current;
       input.moveX = movementRef.current.active ? movementRef.current.x : 0;
       input.moveY = movementRef.current.active ? movementRef.current.y : 0;
+      const flameVisible = movementRef.current.active || input.keyboard.up;
 
       const nextHud = updateGame(gameRef.current, input, dt, now);
       const canvas = canvasRef.current;
       if (canvas) {
         const ctx = canvas.getContext('2d');
         if (ctx) {
-          drawGame(ctx, gameRef.current, now, window.devicePixelRatio || 1, movementRef.current.active);
+          drawGame(ctx, gameRef.current, now, window.devicePixelRatio || 1, flameVisible);
         }
       }
 

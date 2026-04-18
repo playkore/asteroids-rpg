@@ -75,6 +75,8 @@ const SHIP_RADIUS = 12;
 const SHIP_DRAG = 0.992;
 const SHIP_MAX_SPEED = 260;
 const SHIP_JOYSTICK_RESPONSE = 0.2;
+const SHIP_KEYBOARD_ROTATION_SPEED = 4.2;
+const SHIP_KEYBOARD_THRUST = 240;
 const BULLET_SPEED = 560;
 const BULLET_LIFE = 1.05;
 const SHOOT_COOLDOWN = 0.18;
@@ -176,17 +178,12 @@ export function updateGame(
     };
   }
 
-  const moveX = clamp(
-    input.moveX + (input.keyboard.right ? 1 : 0) - (input.keyboard.left ? 1 : 0),
-    -1,
-    1,
-  );
-  const moveY = clamp(
-    input.moveY + (input.keyboard.down ? 1 : 0) - (input.keyboard.up ? 1 : 0),
-    -1,
-    1,
-  );
+  const moveX = clamp(input.moveX, -1, 1);
+  const moveY = clamp(input.moveY, -1, 1);
   const moveMagnitude = Math.min(Math.hypot(moveX, moveY), 1);
+
+  const keyboardTurn = (input.keyboard.right ? 1 : 0) - (input.keyboard.left ? 1 : 0);
+  const keyboardThrust = input.keyboard.up ? 1 : 0;
 
   if (state.ship.alive && moveMagnitude > 0.01) {
     const normalizedX = moveX / Math.max(moveMagnitude, 0.0001);
@@ -196,6 +193,16 @@ export function updateGame(
     state.ship.vx += (targetVx - state.ship.vx) * SHIP_JOYSTICK_RESPONSE;
     state.ship.vy += (targetVy - state.ship.vy) * SHIP_JOYSTICK_RESPONSE;
     state.ship.angle = Math.atan2(state.ship.vy, state.ship.vx);
+  }
+
+  if (state.ship.alive && keyboardTurn !== 0) {
+    state.ship.angle += keyboardTurn * SHIP_KEYBOARD_ROTATION_SPEED * dt;
+  }
+
+  if (state.ship.alive && keyboardThrust > 0) {
+    const accel = SHIP_KEYBOARD_THRUST * keyboardThrust;
+    state.ship.vx += Math.cos(state.ship.angle) * accel * dt;
+    state.ship.vy += Math.sin(state.ship.angle) * accel * dt;
   }
 
   state.ship.vx *= SHIP_DRAG;
