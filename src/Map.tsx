@@ -25,7 +25,6 @@ const ROOT_NODE_RADIUS = 7;
 const DEPTH_SPACING = 196;
 const LANE_SPACING = 92;
 const SVG_MARGIN = 44;
-const MAX_VISIBLE_DEPTH_AHEAD = 4;
 const FORWARD_CONNECTION_ORDER: Array<LevelConnection['kind']> = ['main', 'side', 'challenge', 'shortcut'];
 
 export default function Map({ mapState }: { mapState: MapState | null }) {
@@ -108,7 +107,6 @@ export default function Map({ mapState }: { mapState: MapState | null }) {
 
 export function buildGraphLayout(mapState: MapState): GraphLayout {
   const root = mapState.graph.createRoot(mapState.rootSeed);
-  const maxVisibleDepth = mapState.currentNode.depth + MAX_VISIBLE_DEPTH_AHEAD;
   const visited = new Set<string>();
   const nodes: LayoutNode[] = [];
   const nodeBySeed = new globalThis.Map<string, LayoutNode>();
@@ -117,10 +115,6 @@ export function buildGraphLayout(mapState: MapState): GraphLayout {
 
   const visit = (node: LevelNode) => {
     if (visited.has(node.seed)) {
-      return;
-    }
-
-    if (node.depth > maxVisibleDepth) {
       return;
     }
 
@@ -191,13 +185,18 @@ export function buildGraphLayout(mapState: MapState): GraphLayout {
   positionNode(nodeBySeed.get(root.seed)!);
 
   const bounds = getBounds(nodes);
-  const halfWidth = Math.max(Math.abs(bounds.minX), Math.abs(bounds.maxX)) + SVG_MARGIN;
-  const halfHeight = Math.max(Math.abs(bounds.minY), Math.abs(bounds.maxY)) + SVG_MARGIN;
+  const minX = bounds.minX - SVG_MARGIN;
+  const minY = bounds.minY - SVG_MARGIN;
+  const width = bounds.maxX - bounds.minX + SVG_MARGIN * 2;
+  const height = bounds.maxY - bounds.minY + SVG_MARGIN * 2;
+
+  const maxDepthSeeds = nodes.filter((node) => node.depth === mapState.graph.maxDepth).map((node) => node.seed);
+  console.log('[map] max depth seeds', maxDepthSeeds);
 
   return {
     nodes,
     edges,
-    viewBox: `${-halfWidth} ${-halfHeight} ${halfWidth * 2} ${halfHeight * 2}`,
+    viewBox: `${minX} ${minY} ${width} ${height}`,
   };
 }
 

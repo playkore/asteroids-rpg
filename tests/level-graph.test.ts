@@ -3,7 +3,7 @@ import { deriveSeed } from '../src/seed';
 import { LevelGraph } from '../src/levelGraph';
 
 describe('LevelGraph', () => {
-  it('creates a root level with only forward connections', () => {
+  it('creates a root level with two forward connections', () => {
     const graph = new LevelGraph();
     const root = graph.createRoot(' alpha-7x ');
     const connections = graph.listConnections(root);
@@ -21,9 +21,7 @@ describe('LevelGraph', () => {
   it('adds a back connection for non-root levels', () => {
     const graph = new LevelGraph();
     const root = graph.createRoot('CINDER-5D');
-    const mainConnection = graph
-      .listConnections(root)
-      .find((connection) => connection.kind === 'main');
+    const mainConnection = graph.listConnections(root).find((connection) => connection.kind === 'main');
 
     expect(mainConnection).toBeTruthy();
     if (!mainConnection) {
@@ -53,54 +51,41 @@ describe('LevelGraph', () => {
     expect(graph.listConnections(node)).toEqual(graph.listConnections(node));
   });
 
-  it('introduces challenge and shortcut links at deeper levels', () => {
+  it('limits each node to two forward children and each depth to 12 unique nodes', () => {
     const graph = new LevelGraph();
-    const node = {
-      seed: 'DELTA-2Q',
-      depth: 8,
-      kind: 'main' as const,
-      parentSeed: 'CINDER-5D',
-      enteredVia: 'main:7:0',
-    };
+    const root = graph.createRoot('CINDER-5D');
+    const queue = [root];
+    const seen = new Set<string>();
+    const nodesByDepth = new Map<number, string[]>();
+    const incomingCounts = new Map<string, number>();
 
-    const kinds = graph.listConnections(node).map((connection) => connection.kind);
+    while (queue.length > 0) {
+      const node = queue.shift()!;
+      if (seen.has(node.seed)) {
+        continue;
+      }
 
-    expect(kinds).toEqual(['back', 'main', 'shortcut']);
-  });
+      seen.add(node.seed);
+      const depthNodes = nodesByDepth.get(node.depth) ?? [];
+      depthNodes.push(node.seed);
+      nodesByDepth.set(node.depth, depthNodes);
 
-  it('adds a challenge link on every third depth pattern', () => {
-    const graph = new LevelGraph();
-    const node = {
-      seed: 'DELTA-2Q',
-      depth: 5,
-      kind: 'main' as const,
-      parentSeed: 'CINDER-5D',
-      enteredVia: 'main:4:0',
-    };
+      const forwardConnections = graph.listConnections(node).filter((connection) => connection.kind !== 'back');
+      expect(forwardConnections).toHaveLength(node.depth >= graph.maxDepth ? 0 : 2);
 
-    const kinds = graph.listConnections(node).map((connection) => connection.kind);
+      for (const connection of forwardConnections) {
+        const child = graph.followConnection(node, connection);
+        incomingCounts.set(child.seed, (incomingCounts.get(child.seed) ?? 0) + 1);
+        queue.push(child);
+      }
+    }
 
-    expect(kinds).toEqual(['back', 'main', 'side', 'challenge']);
-  });
+    for (const seeds of nodesByDepth.values()) {
+      expect(new Set(seeds).size).toBeLessThanOrEqual(12);
+    }
 
-  it('caps forward progression at the configured max depth', () => {
-    const graph = new LevelGraph({ maxDepth: 3 });
-    const node = {
-      seed: 'BRAVO-1A',
-      depth: 3,
-      kind: 'main' as const,
-      parentSeed: 'ALPHA-7X',
-      enteredVia: 'main:2:0',
-    };
-
-    expect(graph.listConnections(node)).toEqual([
-      {
-        key: 'back:main:2:0',
-        kind: 'back',
-        targetSeed: 'ALPHA-7X',
-        targetDepth: 2,
-      },
-    ]);
+    const mergedNode = Array.from(incomingCounts.values()).some((count) => count > 1);
+    expect(mergedNode).toBe(true);
   });
 
   it('derives child seeds from the current seed and connection key', () => {
@@ -109,5 +94,36 @@ describe('LevelGraph', () => {
     const connection = graph.listConnections(root)[0]!;
 
     expect(connection.targetSeed).toBe(deriveSeed(root.seed, connection.key));
+  });
+
+  it('keeps every depth at or below twelve unique nodes', () => {
+    const graph = new LevelGraph();
+    const root = graph.createRoot('ECHO-9P');
+    const queue = [root];
+    const seen = new Set<string>();
+    const byDepth = new Map<number, Set<string>>();
+
+    while (queue.length > 0) {
+      const node = queue.shift()!;
+      if (seen.has(node.seed)) {
+        continue;
+      }
+
+      seen.add(node.seed);
+      const depthSeeds = byDepth.get(node.depth) ?? new Set<string>();
+      depthSeeds.add(node.seed);
+      byDepth.set(node.depth, depthSeeds);
+
+      for (const connection of graph.listConnections(node)) {
+        if (connection.kind === 'back') {
+          continue;
+        }
+        queue.push(graph.followConnection(node, connection));
+      }
+    }
+
+    for (const depthSeeds of byDepth.values()) {
+      expect(depthSeeds.size).toBeLessThanOrEqual(12);
+    }
   });
 });
