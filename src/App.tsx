@@ -22,7 +22,9 @@ export default function App() {
       <canvas ref={canvasRef} className="game-canvas" />
 
       <Hud hud={hud} />
-      <MapToggleButton open={screen.mapOpen} onToggle={screen.toggleMap} />
+      {!screen.mapOpen ? (
+        <MapToggleButton open={screen.mapOpen} onToggle={screen.toggleMap} />
+      ) : null}
 
       {hud.gameOver ? (
         <div className="overlay">
