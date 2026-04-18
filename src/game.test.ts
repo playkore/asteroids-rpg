@@ -54,7 +54,7 @@ describe('game logic', () => {
     expect(linesIntersect(0, 0, 10, 0, 20, -5, 20, 5)).toBe(false);
   });
 
-  it('causes the ship to lose a life when crossing a cave wall', () => {
+  it('bounces the ship when crossing a cave wall', () => {
     const state = createGameState(800, 600);
     state.cave = [
       { x: -10, y: -10 },
@@ -71,10 +71,10 @@ describe('game logic', () => {
 
     updateGame(state, createInputState(), 1, 1000);
 
-    expect(state.lives).toBe(2);
-    expect(state.ship.alive).toBe(false);
-    expect(state.ship.vx).toBe(0);
-    expect(state.ship.vy).toBe(0);
+    expect(state.lives).toBe(3);
+    expect(state.ship.alive).toBe(true);
+    expect(state.ship.vx).toBeLessThan(0);
+    expect(state.ship.x).toBe(9);
   });
 
   it('kills bullets when they cross a cave wall', () => {

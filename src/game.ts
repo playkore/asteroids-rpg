@@ -216,17 +216,17 @@ export function updateGame(
   state.ship.vy *= SHIP_DRAG;
   state.ship.x += state.ship.vx * dt;
   state.ship.y += state.ship.vy * dt;
+  const shipEndX = state.ship.x;
+  const shipEndY = state.ship.y;
 
   if (
     state.ship.alive &&
     now >= state.ship.invulnerableUntil &&
-    movementHitsCave(state.cave, shipStartX, shipStartY, state.ship.x, state.ship.y)
+    movementHitsCave(state.cave, shipStartX, shipStartY, shipEndX, shipEndY)
   ) {
     state.ship.x = shipStartX;
     state.ship.y = shipStartY;
-    state.ship.vx = 0;
-    state.ship.vy = 0;
-    loseLife(state, now);
+    reflectVelocity(state.ship, state.cave, shipStartX, shipStartY, shipEndX, shipEndY);
   } else if (state.ship.alive && now >= state.ship.invulnerableUntil) {
     for (const asteroid of state.asteroids) {
       if (distanceSquared(state.ship.x, state.ship.y, asteroid.x, asteroid.y) < Math.pow(SHIP_RADIUS + asteroid.radius, 2)) {
@@ -261,7 +261,7 @@ export function updateGame(
     const asteroidStartY = asteroid.y;
     asteroid.x += asteroid.vx * dt;
     asteroid.y += asteroid.vy * dt;
-    bounceAsteroidOffCave(state.cave, asteroid, asteroidStartX, asteroidStartY);
+    bounceAsteroidOffCave(state.cave, asteroid, asteroidStartX, asteroidStartY, asteroid.x, asteroid.y);
   }
 
   resolveBulletHits(state);
@@ -450,19 +450,22 @@ function movementHitsCave(cave: Vector[], startX: number, startY: number, endX: 
   return findWallHit(cave, startX, startY, endX, endY) !== null;
 }
 
-function bounceAsteroidOffCave(cave: Vector[], asteroid: Asteroid, startX: number, startY: number) {
-  const hit = findWallHit(cave, startX, startY, asteroid.x, asteroid.y);
+function bounceAsteroidOffCave(
+  cave: Vector[],
+  asteroid: Asteroid,
+  startX: number,
+  startY: number,
+  endX: number,
+  endY: number,
+) {
+  const hit = findWallHit(cave, startX, startY, endX, endY);
   if (!hit) {
     return;
   }
 
-  const vx = asteroid.vx;
-  const vy = asteroid.vy;
-  const dot = vx * hit.nx + vy * hit.ny;
-  asteroid.vx = vx - 2 * dot * hit.nx;
-  asteroid.vy = vy - 2 * dot * hit.ny;
-  asteroid.x = startX + hit.nx * 2;
-  asteroid.y = startY + hit.ny * 2;
+  asteroid.x = startX;
+  asteroid.y = startY;
+  reflectVelocity(asteroid, cave, startX, startY, endX, endY);
 }
 
 function findWallHit(cave: Vector[], startX: number, startY: number, endX: number, endY: number) {
@@ -533,6 +536,24 @@ export function linesIntersect(
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
+}
+
+function reflectVelocity(
+  entity: { vx: number; vy: number },
+  cave: Vector[],
+  startX: number,
+  startY: number,
+  endX: number,
+  endY: number,
+) {
+  const hit = findWallHit(cave, startX, startY, endX, endY);
+  if (!hit) {
+    return;
+  }
+
+  const dot = entity.vx * hit.nx + entity.vy * hit.ny;
+  entity.vx -= 2 * dot * hit.nx;
+  entity.vy -= 2 * dot * hit.ny;
 }
 
 function direction(ax: number, ay: number, bx: number, by: number, cx: number, cy: number) {

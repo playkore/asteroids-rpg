@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createGameState } from '../src/game';
-import { asteroidShape, drawGame, getStarfield } from '../src/renderer';
+import { asteroidShape, drawGame } from '../src/renderer';
 import { UI_LINE_COLOR, UI_LINE_WIDTH } from '../src/constants';
 
 function createMockContext() {
@@ -13,6 +13,7 @@ function createMockContext() {
     fill: vi.fn(),
     save: vi.fn(),
     restore: vi.fn(),
+    clip: vi.fn(),
     translate: vi.fn(),
     rotate: vi.fn(),
     moveTo: vi.fn(),
@@ -47,11 +48,14 @@ describe('drawGame', () => {
     expect(first).toBe(second);
   });
 
-  it('reuses the cached starfield array', () => {
-    const first = getStarfield();
-    const second = getStarfield();
+  it('does not draw stars', () => {
+    const ctx = createMockContext();
+    const state = createGameState(320, 240);
+    state.asteroids = [];
+    state.bullets = [];
 
-    expect(first).toBe(second);
-    expect(first).toHaveLength(80);
+    drawGame(ctx, state, 0, 1, false);
+
+    expect(ctx.fillRect).toHaveBeenCalledTimes(1);
   });
 });
