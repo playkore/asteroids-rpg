@@ -96,6 +96,12 @@ const ASTEROID_SPEED: Record<AsteroidSize, number> = {
   1: 122,
 };
 
+const bulletPool: Bullet[] = [];
+const asteroidPool: Asteroid[] = [];
+const bulletResolveBuffers: [Bullet[], Bullet[]] = [[], []];
+const asteroidResolveBuffers: [Asteroid[], Asteroid[]] = [[], []];
+let resolveBufferIndex = 0;
+
 export function createInputState(): InputState {
   return {
     moveX: 0,
@@ -152,6 +158,8 @@ export function resizeGameState(state: GameState, width: number, height: number)
 }
 
 export function restartGame(state: GameState) {
+  releaseBullets(state.bullets);
+  releaseAsteroids(state.asteroids);
   const fresh = createGameState(state.width, state.height);
   Object.assign(state, fresh);
 }
@@ -232,7 +240,7 @@ export function updateGame(
     bullet.y = wrap(bullet.y + bullet.vy * dt, state.height);
     bullet.life -= dt;
   }
-  state.bullets = state.bullets.filter((bullet) => bullet.life > 0);
+  state.bullets = compactBullets(state.bullets);
 
   for (const asteroid of state.asteroids) {
     asteroid.x = wrap(asteroid.x + asteroid.vx * dt, state.width);
@@ -277,19 +285,22 @@ function tryShoot(state: GameState, now: number) {
   }
 
   const muzzleDistance = 16;
-  state.bullets.push({
-    x: state.ship.x + Math.cos(state.ship.angle) * muzzleDistance,
-    y: state.ship.y + Math.sin(state.ship.angle) * muzzleDistance,
-    vx: Math.cos(state.ship.angle) * BULLET_SPEED + state.ship.vx,
-    vy: Math.sin(state.ship.angle) * BULLET_SPEED + state.ship.vy,
-    life: BULLET_LIFE,
-  });
+  const bullet = acquireBullet();
+  bullet.x = state.ship.x + Math.cos(state.ship.angle) * muzzleDistance;
+  bullet.y = state.ship.y + Math.sin(state.ship.angle) * muzzleDistance;
+  bullet.vx = Math.cos(state.ship.angle) * BULLET_SPEED + state.ship.vx;
+  bullet.vy = Math.sin(state.ship.angle) * BULLET_SPEED + state.ship.vy;
+  bullet.life = BULLET_LIFE;
+  state.bullets.push(bullet);
   state.nextShotAt = now + SHOOT_COOLDOWN * 1000;
 }
 
 function resolveBulletHits(state: GameState) {
-  const remainingBullets: Bullet[] = [];
-  const remainingAsteroids: Asteroid[] = [];
+  const nextIndex = resolveBufferIndex ^ 1;
+  const remainingBullets = bulletResolveBuffers[nextIndex]!;
+  const remainingAsteroids = asteroidResolveBuffers[nextIndex]!;
+  remainingBullets.length = 0;
+  remainingAsteroids.length = 0;
   const destroyed = new Set<Asteroid>();
 
   for (const bullet of state.bullets) {
@@ -305,14 +316,14 @@ function resolveBulletHits(state: GameState) {
           const spread = Math.random() * Math.PI * 2;
           const speed = ASTEROID_SPEED[nextSize];
           for (const direction of [-1, 1]) {
-            remainingAsteroids.push({
-              x: asteroid.x,
-              y: asteroid.y,
-              vx: Math.cos(spread + direction * 0.7) * speed + asteroid.vx * 0.4,
-              vy: Math.sin(spread + direction * 0.7) * speed + asteroid.vy * 0.4,
-              size: nextSize,
-              radius: ASTEROID_RADIUS[nextSize],
-            });
+            const splitAsteroid = acquireAsteroid();
+            splitAsteroid.x = asteroid.x;
+            splitAsteroid.y = asteroid.y;
+            splitAsteroid.vx = Math.cos(spread + direction * 0.7) * speed + asteroid.vx * 0.4;
+            splitAsteroid.vy = Math.sin(spread + direction * 0.7) * speed + asteroid.vy * 0.4;
+            splitAsteroid.size = nextSize;
+            splitAsteroid.radius = ASTEROID_RADIUS[nextSize];
+            remainingAsteroids.push(splitAsteroid);
           }
         }
         break;
@@ -320,17 +331,22 @@ function resolveBulletHits(state: GameState) {
     }
     if (!hit) {
       remainingBullets.push(bullet);
+    } else {
+      releaseBullet(bullet);
     }
   }
 
   for (const asteroid of state.asteroids) {
     if (!destroyed.has(asteroid)) {
       remainingAsteroids.push(asteroid);
+    } else {
+      releaseAsteroid(asteroid);
     }
   }
 
   state.bullets = remainingBullets;
   state.asteroids = remainingAsteroids;
+  resolveBufferIndex = nextIndex;
 }
 
 export function loseLife(state: GameState, now: number) {
@@ -357,16 +373,60 @@ function spawnWave(width: number, height: number, wave: number): Asteroid[] {
     const vxAngle = Math.random() * Math.PI * 2;
     const size: AsteroidSize = Math.random() > 0.7 ? 2 : 3;
     const speed = ASTEROID_SPEED[size] * (0.55 + wave * 0.03);
-    asteroids.push({
-      x: wrap(x, width),
-      y: wrap(y, height),
-      vx: Math.cos(vxAngle) * speed,
-      vy: Math.sin(vxAngle) * speed,
-      size,
-      radius: ASTEROID_RADIUS[size],
-    });
+    const asteroid = acquireAsteroid();
+    asteroid.x = wrap(x, width);
+    asteroid.y = wrap(y, height);
+    asteroid.vx = Math.cos(vxAngle) * speed;
+    asteroid.vy = Math.sin(vxAngle) * speed;
+    asteroid.size = size;
+    asteroid.radius = ASTEROID_RADIUS[size];
+    asteroids.push(asteroid);
   }
   return asteroids;
+}
+
+function compactBullets(bullets: Bullet[]) {
+  let writeIndex = 0;
+  for (const bullet of bullets) {
+    if (bullet.life > 0) {
+      bullets[writeIndex] = bullet;
+      writeIndex += 1;
+    } else {
+      releaseBullet(bullet);
+    }
+  }
+  bullets.length = writeIndex;
+  return bullets;
+}
+
+function acquireBullet() {
+  const bullet = bulletPool.pop();
+  return bullet ?? { x: 0, y: 0, vx: 0, vy: 0, life: 0 };
+}
+
+function releaseBullet(bullet: Bullet) {
+  bulletPool.push(bullet);
+}
+
+function releaseBullets(bullets: Bullet[]) {
+  for (const bullet of bullets) {
+    releaseBullet(bullet);
+  }
+}
+
+function acquireAsteroid() {
+  const asteroid = asteroidPool.pop();
+  return asteroid ?? { x: 0, y: 0, vx: 0, vy: 0, size: 3, radius: ASTEROID_RADIUS[3] };
+}
+
+function releaseAsteroid(asteroid: Asteroid) {
+  asteroidPool.push(asteroid);
+}
+
+function releaseAsteroids(asteroids: Asteroid[]) {
+  for (const asteroid of asteroids) {
+    releaseAsteroid(asteroid);
+  }
 }
 
 function asteroidShape(radius: number) {

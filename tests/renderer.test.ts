@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createGameState } from '../src/game';
-import { drawGame } from '../src/renderer';
+import { asteroidShape, drawGame, getStarfield } from '../src/renderer';
 import { UI_LINE_COLOR, UI_LINE_WIDTH } from '../src/constants';
 
 function createMockContext() {
@@ -38,5 +38,20 @@ describe('drawGame', () => {
 
     expect(ctx.lineWidth).toBe(UI_LINE_WIDTH);
     expect(ctx.strokeStyle).toBe(UI_LINE_COLOR);
+  });
+
+  it('reuses cached asteroid shapes for the same radius', () => {
+    const first = asteroidShape(56);
+    const second = asteroidShape(56);
+
+    expect(first).toBe(second);
+  });
+
+  it('reuses the cached starfield array', () => {
+    const first = getStarfield();
+    const second = getStarfield();
+
+    expect(first).toBe(second);
+    expect(first).toHaveLength(80);
   });
 });

@@ -1,6 +1,24 @@
 import type { Asteroid, Bullet, GameState, Ship } from './game';
 import { UI_LINE_COLOR, UI_LINE_WIDTH } from './constants';
 
+type AsteroidPoint = {
+  angle: number;
+  distance: number;
+};
+
+type Star = {
+  x: number;
+  y: number;
+  size: number;
+  bright: boolean;
+  pulseOffset: number;
+};
+
+const ASTEROID_SHAPE_CACHE: Partial<Record<number, AsteroidPoint[]>> = {};
+const STARFIELD = createStarfield();
+const BRIGHT_STARS = '#f4fbff';
+const DIM_STARS = '#7f8b98';
+
 export function drawGame(
   ctx: CanvasRenderingContext2D,
   state: GameState,
@@ -21,14 +39,20 @@ export function drawGame(
   drawShip(ctx, state.ship, flameVisible);
 }
 
+export function getStarfield() {
+  return STARFIELD;
+}
+
 function drawStarfield(ctx: CanvasRenderingContext2D, width: number, height: number, now: number) {
-  const stars = 80;
-  for (let i = 0; i < stars; i += 1) {
-    const x = (Math.sin(i * 999 + now * 0.00003) * 0.5 + 0.5) * width;
-    const y = (Math.sin(i * 321 + now * 0.00004) * 0.5 + 0.5) * height;
-    const size = i % 5 === 0 ? 1.5 : 1;
-    ctx.fillStyle = i % 6 === 0 ? '#dce4ee' : '#7f8b98';
-    ctx.fillRect(x, y, size, size);
+  const twinkleFrame = Math.floor(now / 180);
+  for (const star of STARFIELD) {
+    ctx.fillStyle =
+      ((twinkleFrame + star.pulseOffset) & 3) === 0
+        ? BRIGHT_STARS
+        : star.bright
+          ? BRIGHT_STARS
+          : DIM_STARS;
+    ctx.fillRect(star.x * width, star.y * height, star.size, star.size);
   }
 }
 
@@ -89,11 +113,41 @@ function drawShip(ctx: CanvasRenderingContext2D, ship: Ship, flameVisible: boole
   ctx.restore();
 }
 
-function asteroidShape(radius: number) {
+export function asteroidShape(radius: number) {
+  const cached = ASTEROID_SHAPE_CACHE[radius];
+  if (cached) {
+    return cached;
+  }
+
   const segments = 9;
-  return Array.from({ length: segments }, (_, index) => {
+  const points = Array.from({ length: segments }, (_, index) => {
     const angle = (index / segments) * Math.PI * 2;
     const distance = 0.78 + 0.27 * Math.sin(radius * 0.11 + index * 2.1);
     return { angle, distance };
   });
+  ASTEROID_SHAPE_CACHE[radius] = points;
+  return points;
+}
+
+function createStarfield() {
+  const stars: Star[] = [];
+  let seed = 0x12345678;
+  for (let i = 0; i < 80; i += 1) {
+    seed = nextSeed(seed);
+    const x = seed / 0xffffffff;
+    seed = nextSeed(seed);
+    const y = seed / 0xffffffff;
+    stars.push({
+      x,
+      y,
+      size: i % 5 === 0 ? 1.5 : 1,
+      bright: i % 6 === 0,
+      pulseOffset: i % 4,
+    });
+  }
+  return stars;
+}
+
+function nextSeed(seed: number) {
+  return (seed * 1664525 + 1013904223) >>> 0;
 }
