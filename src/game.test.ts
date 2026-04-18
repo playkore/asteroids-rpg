@@ -2,6 +2,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { generateCave, isPointInsidePolygon } from './cave';
 import { createGameState, createInputState, linesIntersect, updateGame } from './game';
+import { deriveSeed } from './seed';
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -15,8 +16,49 @@ describe('game logic', () => {
     expect(state.ship.y).toBe(0);
     expect(state.cave.length).toBeGreaterThan(100);
     expect(Math.max(...state.cave.map((point) => Math.hypot(point.x, point.y)))).toBeGreaterThan(500);
-    expect(state.deadEnds.length).toBeGreaterThan(0);
+    expect(state.portals.length).toBeGreaterThan(0);
     expect(state.asteroids.every((asteroid) => Math.hypot(asteroid.x, asteroid.y) > 260)).toBe(true);
+  });
+
+  it('traverses portals to deterministic child levels and back again', () => {
+    const rootSeed = 'CINDER-5D';
+    const state = createGameState(800, 600, rootSeed);
+    const forwardPortal = state.portals.find((portal) => portal.kind === 'forward');
+
+    expect(forwardPortal).toBeTruthy();
+    if (!forwardPortal) {
+      return;
+    }
+
+    state.ship.x = forwardPortal.x;
+    state.ship.y = forwardPortal.y;
+    state.asteroids = [];
+    state.bullets = [];
+
+    updateGame(state, createInputState(), 0, 1000);
+
+    expect(state.seed).toBe(deriveSeed(rootSeed, forwardPortal.key));
+    expect(state.parentSeed).toBe(rootSeed);
+    expect(state.levelHistory).toHaveLength(1);
+    expect(state.portals.some((portal) => portal.kind === 'back')).toBe(true);
+
+    const backPortal = state.portals.find((portal) => portal.kind === 'back');
+    expect(backPortal).toBeTruthy();
+    if (!backPortal) {
+      return;
+    }
+
+    state.ship.x = backPortal.x;
+    state.ship.y = backPortal.y;
+    state.asteroids = [];
+    state.bullets = [];
+    state.portalCooldownUntil = 0;
+
+    updateGame(state, createInputState(), 0, 2000);
+
+    expect(state.seed).toBe(rootSeed);
+    expect(state.parentSeed).toBeNull();
+    expect(state.levelHistory).toHaveLength(0);
   });
 
   it('increments score when a bullet hits an asteroid', () => {
@@ -175,5 +217,15 @@ describe('cave generation', () => {
 
     expect(cave.length).toBeGreaterThan(100);
     expect(cave[0]).toEqual(expect.objectContaining({ x: expect.any(Number), y: expect.any(Number) }));
+  });
+
+  it('generates the same portal layout for the same seed', () => {
+    const first = createGameState(800, 600, 'CINDER-5D');
+    const second = createGameState(800, 600, 'CINDER-5D');
+
+    expect(first.portals.map((portal) => portal.key)).toEqual(second.portals.map((portal) => portal.key));
+    expect(first.portals.map((portal) => [portal.x, portal.y, portal.kind])).toEqual(
+      second.portals.map((portal) => [portal.x, portal.y, portal.kind]),
+    );
   });
 });

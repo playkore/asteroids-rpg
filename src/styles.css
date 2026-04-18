@@ -101,6 +101,17 @@ button {
   background: #070a10;
 }
 
+.hud__pill--seed {
+  max-width: 180px;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.hud__pill--seed strong {
+  word-break: break-word;
+}
+
 .hud__pill span {
   display: block;
   font-size: 0.62rem;

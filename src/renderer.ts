@@ -37,7 +37,7 @@ export function drawGame(
   ctx.save();
   ctx.translate(-cameraX, -cameraY);
   drawCave(ctx, state.cave);
-  drawDeadEnds(ctx, state.deadEnds);
+  drawPortals(ctx, state.portals);
   drawAsteroids(ctx, state.asteroids);
   drawBullets(ctx, state.bullets);
   drawShip(ctx, state.ship, flameVisible);
@@ -147,14 +147,14 @@ function drawAsteroids(ctx: CanvasRenderingContext2D, asteroids: Asteroid[]) {
   }
 }
 
-function drawDeadEnds(ctx: CanvasRenderingContext2D, deadEnds: { x: number; y: number }[]) {
-  if (deadEnds.length === 0) {
+function drawPortals(ctx: CanvasRenderingContext2D, portals: { x: number; y: number }[]) {
+  if (portals.length === 0) {
     return;
   }
 
   ctx.strokeStyle = UI_LINE_COLOR;
   ctx.lineWidth = UI_LINE_WIDTH;
-  for (const deadEnd of deadEnds) {
+  for (const deadEnd of portals) {
     ctx.beginPath();
     ctx.arc(deadEnd.x, deadEnd.y, 10, 0, Math.PI * 2);
     ctx.stroke();

@@ -15,6 +15,7 @@ const INITIAL_HUD: HudState = {
   score: 0,
   lives: 3,
   wave: 1,
+  seed: '',
   gameOver: false,
   ready: false,
 };
@@ -41,6 +42,7 @@ export function useGameLoop(paused: boolean, started: boolean, seed: string) {
       score: gameRef.current.score,
       lives: gameRef.current.lives,
       wave: gameRef.current.wave,
+      seed: gameRef.current.seed,
       gameOver: gameRef.current.gameOver,
       ready: !gameRef.current.gameOver && gameRef.current.ship.alive,
     });
@@ -103,6 +105,7 @@ export function useGameLoop(paused: boolean, started: boolean, seed: string) {
       score: gameRef.current.score,
       lives: gameRef.current.lives,
       wave: gameRef.current.wave,
+      seed: gameRef.current.seed,
       gameOver: gameRef.current.gameOver,
       ready: !gameRef.current.gameOver && gameRef.current.ship.alive,
     });

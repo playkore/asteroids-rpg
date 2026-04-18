@@ -11,7 +11,11 @@ type Node = {
 
 export type CaveLayout = {
   boundary: Vector[];
-  deadEnds: Vector[];
+  deadEnds: CavePortal[];
+};
+
+export type CavePortal = Vector & {
+  key: string;
 };
 
 function distToSegment(
@@ -245,7 +249,18 @@ export function generateCaveLayout(random: RandomFn = Math.random): CaveLayout {
 
   const deadEnds = nodes
     .filter((node) => node !== startNode && node.edges.length === 1)
-    .map((node) => ({ x: node.x, y: node.y }));
+    .map((node) => ({ x: node.x, y: node.y }))
+    .sort((a, b) => {
+      const angleDiff = Math.atan2(a.y, a.x) - Math.atan2(b.y, b.x);
+      if (Math.abs(angleDiff) > 0.0001) {
+        return angleDiff;
+      }
+      return Math.hypot(a.x, a.y) - Math.hypot(b.x, b.y);
+    })
+    .map((node, index) => ({
+      ...node,
+      key: `${index}:${Math.round(node.x)}:${Math.round(node.y)}`,
+    }));
 
   return {
     boundary,

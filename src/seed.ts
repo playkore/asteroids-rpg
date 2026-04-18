@@ -32,6 +32,14 @@ export function normalizeSeed(seed: string) {
   return seed.trim().toUpperCase();
 }
 
+export function deriveSeed(parentSeed: string, portalKey: string) {
+  const hash = hashSeed(`${normalizeSeed(parentSeed)}|${portalKey}`);
+  const word = SEED_WORDS[hash % SEED_WORDS.length]!;
+  const digit = (hash >>> 3) % 10;
+  const suffix = String.fromCharCode(65 + ((hash >>> 8) % 26));
+  return `${word}-${digit}${suffix}`;
+}
+
 function hashSeed(seed: string) {
   let hash = 2166136261;
   for (let i = 0; i < seed.length; i += 1) {

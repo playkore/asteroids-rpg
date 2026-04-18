@@ -49,7 +49,7 @@ describe('drawGame', () => {
     const state = createGameState(320, 240);
     state.asteroids = [];
     state.bullets = [];
-    state.deadEnds = [];
+    state.portals = [];
 
     drawGame(ctx, state, 0, 1, false);
 
@@ -69,7 +69,7 @@ describe('drawGame', () => {
     const state = createGameState(320, 240);
     state.asteroids = [];
     state.bullets = [];
-    state.deadEnds = [];
+    state.portals = [];
 
     drawGame(ctx, state, 0, 1, false);
 
@@ -91,7 +91,7 @@ describe('drawGame', () => {
       },
     ];
     state.bullets = [];
-    state.deadEnds = [];
+    state.portals = [];
 
     drawGame(ctx, state, 0, 1, false);
 
@@ -158,7 +158,7 @@ describe('drawGame', () => {
     expect((ctx as any).arc.mock.calls).toHaveLength(1);
   });
 
-  it('draws dead-end circles on the main screen', () => {
+  it('draws portal circles on the main screen', () => {
     const ctx = createMockContext();
     const state = createGameState(320, 240);
     state.cave = [
@@ -167,7 +167,7 @@ describe('drawGame', () => {
       { x: 20, y: 20 },
       { x: -20, y: 20 },
     ];
-    state.deadEnds = [{ x: 10, y: 0 }];
+    state.portals = [{ x: 10, y: 0, key: 'portal-1', targetSeed: 'ALPHA-7X', kind: 'forward' }];
     state.asteroids = [];
     state.bullets = [];
 

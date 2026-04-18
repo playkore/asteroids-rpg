@@ -1,5 +1,5 @@
 import { generateCaveLayout } from './cave';
-import { createSeededRandom, generateSeed } from './seed';
+import { createSeededRandom, deriveSeed, generateSeed } from './seed';
 
 export type Vector = {
   x: number;
@@ -38,11 +38,14 @@ export type Asteroid = {
 export type GameState = {
   seed: string;
   random: () => number;
+  parentSeed: string | null;
+  parentPortalKey: string | null;
+  levelHistory: LevelFrameMeta[];
   ship: Ship;
   bullets: Bullet[];
   asteroids: Asteroid[];
   cave: Vector[];
-  deadEnds: Vector[];
+  portals: Portal[];
   score: number;
   lives: number;
   wave: number;
@@ -52,6 +55,7 @@ export type GameState = {
   nextShotAt: number;
   respawnAt: number;
   waveClearAt: number;
+  portalCooldownUntil: number;
 };
 
 export type InputState = {
@@ -74,8 +78,29 @@ export type HudState = {
   score: number;
   lives: number;
   wave: number;
+  seed: string;
   gameOver: boolean;
   ready: boolean;
+};
+
+export type Portal = {
+  key: string;
+  x: number;
+  y: number;
+  targetSeed: string;
+  kind: 'forward' | 'back';
+};
+
+export type LevelFrameMeta = {
+  seed: string;
+  parentSeed: string | null;
+  parentPortalKey: string | null;
+};
+
+type CreateGameStateOptions = {
+  parentSeed?: string | null;
+  parentPortalKey?: string | null;
+  levelHistory?: LevelFrameMeta[];
 };
 
 const SHIP_RADIUS = 12;
@@ -128,12 +153,37 @@ export function createInputState(): InputState {
   };
 }
 
-export function createGameState(width: number, height: number, seed = generateSeed()): GameState {
+export function createGameState(
+  width: number,
+  height: number,
+  seed = generateSeed(),
+  options: CreateGameStateOptions = {},
+): GameState {
   const random = createSeededRandom(seed);
   const caveLayout = generateCaveLayout(random);
+  const levelHistory = options.levelHistory ?? [];
+  const parentSeed = options.parentSeed ?? null;
+  const parentPortalKey = options.parentPortalKey ?? null;
+  const backPortalIndex =
+    parentSeed === null || caveLayout.deadEnds.length === 0
+      ? -1
+      : Math.floor(createSeededRandom(`${seed}|${parentSeed}`)() * caveLayout.deadEnds.length);
+  const portals = caveLayout.deadEnds.map((deadEnd, index) => ({
+    key: deadEnd.key,
+    x: deadEnd.x,
+    y: deadEnd.y,
+    kind: index === backPortalIndex ? ('back' as const) : ('forward' as const),
+    targetSeed:
+      index === backPortalIndex
+        ? parentSeed ?? deriveSeed(seed, deadEnd.key)
+        : deriveSeed(seed, deadEnd.key),
+  }));
   return {
     seed,
     random,
+    parentSeed,
+    parentPortalKey,
+    levelHistory,
     ship: {
       x: 0,
       y: 0,
@@ -146,7 +196,7 @@ export function createGameState(width: number, height: number, seed = generateSe
     bullets: [],
     asteroids: spawnWave(1, caveLayout.boundary, random),
     cave: caveLayout.boundary,
-    deadEnds: caveLayout.deadEnds,
+    portals,
     score: 0,
     lives: 3,
     wave: 1,
@@ -156,6 +206,7 @@ export function createGameState(width: number, height: number, seed = generateSe
     nextShotAt: 0,
     respawnAt: 0,
     waveClearAt: 0,
+    portalCooldownUntil: 0,
   };
 }
 
@@ -167,7 +218,11 @@ export function resizeGameState(state: GameState, width: number, height: number)
 export function restartGame(state: GameState) {
   releaseBullets(state.bullets);
   releaseAsteroids(state.asteroids);
-  const fresh = createGameState(state.width, state.height, state.seed);
+  const fresh = createGameState(state.width, state.height, state.seed, {
+    parentSeed: state.parentSeed,
+    parentPortalKey: state.parentPortalKey,
+    levelHistory: state.levelHistory,
+  });
   Object.assign(state, fresh);
 }
 
@@ -188,6 +243,7 @@ export function updateGame(
       score: state.score,
       lives: state.lives,
       wave: state.wave,
+      seed: state.seed,
       gameOver: true,
       ready: false,
     };
@@ -246,6 +302,21 @@ export function updateGame(
     }
   }
 
+  if (state.ship.alive && now >= state.portalCooldownUntil) {
+    const portal = findActivePortal(state, state.ship.x, state.ship.y);
+    if (portal) {
+      travelThroughPortal(state, portal, now);
+      return {
+        score: state.score,
+        lives: state.lives,
+        wave: state.wave,
+        seed: state.seed,
+        gameOver: state.gameOver,
+        ready: !state.gameOver && state.ship.alive && now >= state.ship.invulnerableUntil,
+      };
+    }
+  }
+
   if (input.shootRequested || input.keyboard.shoot || input.shootHeld) {
     tryShoot(state, now);
   }
@@ -301,6 +372,7 @@ export function updateGame(
     score: state.score,
     lives: state.lives,
     wave: state.wave,
+    seed: state.seed,
     gameOver: state.gameOver,
     ready: !state.gameOver && state.ship.alive && now >= state.ship.invulnerableUntil,
   };
@@ -374,6 +446,53 @@ function resolveBulletHits(state: GameState) {
   state.bullets = remainingBullets;
   state.asteroids = remainingAsteroids;
   resolveBufferIndex = nextIndex;
+}
+
+function findActivePortal(state: GameState, x: number, y: number) {
+  for (const portal of state.portals) {
+    if (distanceSquared(x, y, portal.x, portal.y) <= 10 * 10) {
+      return portal;
+    }
+  }
+  return null;
+}
+
+function travelThroughPortal(state: GameState, portal: Portal, now: number) {
+  releaseBullets(state.bullets);
+  releaseAsteroids(state.asteroids);
+
+  const previousFrame = state.levelHistory[state.levelHistory.length - 1] ?? null;
+  const nextSeed = portal.kind === 'back' ? state.parentSeed : portal.targetSeed;
+  if (!nextSeed) {
+    return;
+  }
+
+  const nextParentSeed = portal.kind === 'back' ? previousFrame?.parentSeed ?? null : state.seed;
+  const nextParentPortalKey = portal.kind === 'back' ? previousFrame?.parentPortalKey ?? null : portal.key;
+  const nextHistory =
+    portal.kind === 'back'
+      ? state.levelHistory.slice(0, -1)
+      : [
+          ...state.levelHistory,
+          {
+            seed: state.seed,
+            parentSeed: state.parentSeed,
+            parentPortalKey: state.parentPortalKey,
+          },
+        ];
+  const fresh = createGameState(state.width, state.height, nextSeed, {
+    parentSeed: nextParentSeed,
+    parentPortalKey: nextParentPortalKey,
+    levelHistory: nextHistory,
+  });
+
+  const score = state.score;
+  const lives = state.lives;
+  Object.assign(state, fresh);
+  state.score = score;
+  state.lives = lives;
+  state.wave = 1;
+  state.portalCooldownUntil = now + 300;
 }
 
 export function loseLife(state: GameState, now: number) {
