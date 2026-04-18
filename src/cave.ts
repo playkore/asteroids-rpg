@@ -235,3 +235,18 @@ export function generateCave(): Vector[] {
 
   return boundary;
 }
+
+export function isPointInsidePolygon(px: number, py: number, polygon: Vector[]) {
+  let inside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i) {
+    const current = polygon[i]!;
+    const previous = polygon[j]!;
+    const intersects =
+      current.y > py !== previous.y > py &&
+      px < ((previous.x - current.x) * (py - current.y)) / (previous.y - current.y) + current.x;
+    if (intersects) {
+      inside = !inside;
+    }
+  }
+  return inside;
+}

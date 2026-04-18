@@ -86,6 +86,7 @@ const SHOOT_COOLDOWN = 0.18;
 const INVULNERABILITY_TIME = 2.2;
 const RESPAWN_DELAY = 1.1;
 const WAVE_DELAY = 1.3;
+const SPAWN_SAFE_RADIUS = 260;
 
 const ASTEROID_RADIUS: Record<AsteroidSize, number> = {
   3: 56,
@@ -268,8 +269,8 @@ export function updateGame(
   resolveBulletHits(state);
 
   if (!state.ship.alive && state.respawnAt > 0 && now >= state.respawnAt) {
-    state.ship.x = state.width / 2;
-    state.ship.y = state.height / 2;
+    state.ship.x = 0;
+    state.ship.y = 0;
     state.ship.vx = 0;
     state.ship.vy = 0;
     state.ship.alive = true;
@@ -395,22 +396,32 @@ function isPointInPolygon(px: number, py: number, polygon: Vector[]) {
 function spawnWave(wave: number, cave: Vector[]): Asteroid[] {
   const count = Math.min(4 + wave, 10);
   const asteroids: Asteroid[] = [];
-  for (let i = 0; i < count; i += 1) {
+  let attempts = 0;
+  for (let i = 0; i < count && attempts < 5000; ) {
+    attempts += 1;
     let x = 0;
     let y = 0;
     let valid = false;
-    for (let tries = 0; tries < 100; tries += 1) {
+    for (let tries = 0; tries < 200; tries += 1) {
       const angle = Math.random() * Math.PI * 2;
       const dist = 200 + Math.random() * 2500;
       const testX = Math.cos(angle) * dist;
       const testY = Math.sin(angle) * dist;
-      if (cave.length === 0 || isPointInPolygon(testX, testY, cave)) {
+      if (
+        (cave.length === 0 || isPointInPolygon(testX, testY, cave)) &&
+        Math.hypot(testX, testY) > SPAWN_SAFE_RADIUS
+      ) {
         x = testX;
         y = testY;
         valid = true;
         break;
       }
     }
+
+    if (!valid) {
+      continue;
+    }
+
     const vxAngle = Math.random() * Math.PI * 2;
     const size: AsteroidSize = Math.random() > 0.7 ? 2 : 3;
     const speed = ASTEROID_SPEED[size] * (0.55 + wave * 0.03);
@@ -422,6 +433,7 @@ function spawnWave(wave: number, cave: Vector[]): Asteroid[] {
     asteroid.size = size;
     asteroid.radius = ASTEROID_RADIUS[size];
     asteroids.push(asteroid);
+    i += 1;
   }
   return asteroids;
 }

@@ -1,6 +1,6 @@
 // src/game.test.ts
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { generateCave } from './cave';
+import { generateCave, isPointInsidePolygon } from './cave';
 import { createGameState, createInputState, linesIntersect, updateGame } from './game';
 
 afterEach(() => {
@@ -15,6 +15,7 @@ describe('game logic', () => {
     expect(state.ship.y).toBe(0);
     expect(state.cave.length).toBeGreaterThan(100);
     expect(Math.max(...state.cave.map((point) => Math.hypot(point.x, point.y)))).toBeGreaterThan(500);
+    expect(state.asteroids.every((asteroid) => Math.hypot(asteroid.x, asteroid.y) > 260)).toBe(true);
   });
 
   it('increments score when a bullet hits an asteroid', () => {
@@ -129,9 +130,44 @@ describe('game logic', () => {
     expect(state.asteroids[0]!.vx).toBeLessThan(0);
     expect(state.asteroids[0]!.x).toBeLessThan(10);
   });
+
+  it('respawns the ship at the cave origin', () => {
+    const state = createGameState(800, 600);
+    state.ship.alive = false;
+    state.ship.x = 120;
+    state.ship.y = 80;
+    state.respawnAt = 1000;
+
+    updateGame(state, createInputState(), 0, 1000);
+
+    expect(state.ship.alive).toBe(true);
+    expect(state.ship.x).toBe(0);
+    expect(state.ship.y).toBe(0);
+  });
+
+  it('does not immediately hit the ship on a fresh update', () => {
+    const state = createGameState(800, 600);
+
+    updateGame(state, createInputState(), 0, 0);
+
+    expect(state.lives).toBe(3);
+    expect(state.ship.alive).toBe(true);
+  });
 });
 
 describe('cave generation', () => {
+  it('detects points inside a polygon', () => {
+    const square = [
+      { x: -10, y: -10 },
+      { x: 10, y: -10 },
+      { x: 10, y: 10 },
+      { x: -10, y: 10 },
+    ];
+
+    expect(isPointInsidePolygon(0, 0, square)).toBe(true);
+    expect(isPointInsidePolygon(20, 0, square)).toBe(false);
+  });
+
   it('generates a closed organic polygon', () => {
     const cave = generateCave();
 
