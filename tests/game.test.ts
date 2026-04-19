@@ -671,4 +671,53 @@ describe('game logic', () => {
     expect(hydrated.asteroids.every((asteroid) => asteroid.x >= 20 && asteroid.x <= 180)).toBe(true);
     expect(hydrated.asteroids.every((asteroid) => asteroid.y >= 20 && asteroid.y <= 180)).toBe(true);
   });
+
+  it('ignores stale session timers when hydrating a saved game', () => {
+    const snapshot: SaveSlotData = {
+      version: 1,
+      seed: 'CINDER-5D',
+      width: 320,
+      height: 240,
+      currentCell: { x: 0, y: 0 },
+      ship: {
+        x: 160,
+        y: -1,
+        vx: 0,
+        vy: 0,
+        angle: 0,
+        invulnerableUntil: 999999,
+        alive: true,
+      },
+      player: {
+        level: 1,
+        xp: 0,
+        hp: 10,
+        maxHp: 10,
+        attack: 2,
+      },
+      nextShotAt: 999999,
+      transitionCooldownUntil: 999999,
+      regenAccumulator: 0,
+      spawnCounter: 0,
+      gameOver: false,
+      cells: {
+        '0:0': {
+          kind: 'empty',
+          visited: true,
+          cleared: false,
+          remaining: { 3: 0, 2: 0, 1: 0 },
+        },
+      },
+      savedAt: 0,
+    };
+
+    const state = hydrateGameState(snapshot);
+
+    updateGame(state, createInputState(), 0, 1000);
+
+    expect(state.currentCell).toEqual({ x: 0, y: 1 });
+    expect(state.ship.y).toBeCloseTo(239);
+    expect(state.nextShotAt).toBe(0);
+    expect(state.transitionCooldownUntil).toBeGreaterThan(0);
+  });
 });

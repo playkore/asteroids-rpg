@@ -246,10 +246,13 @@ export function hydrateGameState(
     currentCell: snapshot.currentCell,
     player: snapshot.player,
     cells: snapshot.cells,
-    ship: snapshot.ship,
+    ship: {
+      ...snapshot.ship,
+      invulnerableUntil: 0,
+    },
     gameOver: snapshot.gameOver,
-    nextShotAt: snapshot.nextShotAt,
-    transitionCooldownUntil: snapshot.transitionCooldownUntil,
+    nextShotAt: 0,
+    transitionCooldownUntil: 0,
     regenAccumulator: snapshot.regenAccumulator,
     spawnCounter: snapshot.spawnCounter,
   });
