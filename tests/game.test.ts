@@ -22,6 +22,13 @@ describe('game logic', () => {
     expect(first).toEqual(second);
   });
 
+  it('always generates cells below y=0 as empty', () => {
+    const cell = generateCellRecord('CINDER-5D', { x: 2, y: -1 });
+
+    expect(cell.kind).toBe('empty');
+    expect(cell.remaining).toEqual({ 3: 0, 2: 0, 1: 0 });
+  });
+
   it('moves the player into the cell above when crossing the top edge', () => {
     const state = createGameState(320, 240, 'CINDER-5D');
     state.cells[cellKey(state.currentCell)] = {
@@ -46,7 +53,7 @@ describe('game logic', () => {
     expect(state.saveRequested).toBe(true);
   });
 
-  it('keeps the player in the bottom row when trying to move below y=0', () => {
+  it('allows the player to move into negative y cells and keeps them empty', () => {
     const state = createGameState(320, 240, 'CINDER-5D');
     state.cells[cellKey(state.currentCell)] = {
       kind: 'empty',
@@ -64,8 +71,9 @@ describe('game logic', () => {
 
     updateGame(state, createInputState(), 0, 1000);
 
-    expect(state.currentCell).toEqual({ x: 0, y: 0 });
-    expect(state.ship.y).toBe(239);
+    expect(state.currentCell).toEqual({ x: 0, y: -1 });
+    expect(state.ship.y).toBe(1);
+    expect(state.cells[cellKey({ x: 0, y: -1 })]?.kind).toBe('empty');
   });
 
   it('wraps asteroids around the screen', () => {

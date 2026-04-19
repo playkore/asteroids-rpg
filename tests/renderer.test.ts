@@ -81,6 +81,7 @@ describe('drawGame', () => {
   it('draws the mini-map with visited cells and a current cell marker', () => {
     const ctx = createMockContext();
     const state = createGameState(320, 240);
+    const current = { x: 0, y: 0 };
     state.cells = {
       '0:0': {
         kind: 'combat',
@@ -95,7 +96,7 @@ describe('drawGame', () => {
         remaining: { 3: 0, 2: 0, 1: 0 },
       },
     };
-    state.currentCell = { x: 0, y: 0 };
+    state.currentCell = current;
     state.asteroids = [];
 
     drawMiniMap(ctx, state, 1, 160, 160);
@@ -103,28 +104,35 @@ describe('drawGame', () => {
     expect(ctx.strokeRect).toHaveBeenCalled();
     expect(ctx.arc).toHaveBeenCalled();
     expect(ctx.fillRect).toHaveBeenCalled();
+    expect(buildMiniMapLayout(state, 160, 160).cells).toHaveLength(49);
+    const centerCell = buildMiniMapLayout(state, 160, 160).cells[24];
+    expect(centerCell?.current).toBe(true);
+    expect(centerCell?.key).toBe('0:0');
   });
 
-  it('does not include cells below y=0 in the mini-map layout', () => {
+  it('always centers the current cell in a 7x7 mini-map layout', () => {
     const state = createGameState(320, 240);
-    state.currentCell = { x: 0, y: 0 };
+    state.currentCell = { x: 10, y: 0 };
     state.cells = {
-      '0:0': {
+      '10:0': {
         kind: 'combat',
         visited: true,
         cleared: false,
         remaining: { 3: 1, 2: 0, 1: 0 },
       },
-      '0:1': {
-        kind: 'combat',
+      '10:-1': {
+        kind: 'empty',
         visited: true,
         cleared: false,
-        remaining: { 3: 1, 2: 0, 1: 0 },
+        remaining: { 3: 0, 2: 0, 1: 0 },
       },
     };
 
     const layout = buildMiniMapLayout(state, 160, 160);
 
-    expect(layout.cells.every((cell) => Number(cell.key.split(':')[1]) >= 0)).toBe(true);
+    expect(layout.cells).toHaveLength(49);
+    expect(layout.cells[24]?.key).toBe('10:0');
+    expect(layout.cells[24]?.current).toBe(true);
+    expect(layout.cells.some((cell) => cell.key === '10:-1')).toBe(true);
   });
 });

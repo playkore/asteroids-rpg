@@ -366,6 +366,19 @@ export function getCellLevel(cell: CellCoord) {
 }
 
 export function generateCellRecord(seed: string, cell: CellCoord): CellState {
+  if (cell.y < 0) {
+    return {
+      kind: 'empty',
+      visited: false,
+      cleared: false,
+      remaining: {
+        3: 0,
+        2: 0,
+        1: 0,
+      },
+    };
+  }
+
   const random = createSeededRandom(deriveSeed(seed, cellKey(cell)));
   const combat = random() < 0.25;
   return {
@@ -536,12 +549,6 @@ function handleCellTransitions(state: GameState, now: number) {
       x: state.currentCell.x + delta.dx,
       y: state.currentCell.y + delta.dy,
     };
-    if (nextCell.y < 0) {
-      state.ship.x = clamp(state.ship.x, 0, state.width);
-      state.ship.y = Math.min(state.height - 1, Math.max(0, state.ship.y));
-      state.ship.vy = Math.min(0, state.ship.vy);
-      return;
-    }
 
     state.currentCell = nextCell;
     state.ship.x = delta.nextX;

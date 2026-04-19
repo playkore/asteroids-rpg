@@ -201,33 +201,24 @@ type MiniMapCell = {
 };
 
 export function buildMiniMapLayout(state: GameState, width: number, height: number) {
-  const cellKeys = Object.keys(state.cells);
-  const xs = cellKeys.map((key) => Number(key.split(':')[0]));
-  const ys = cellKeys.map((key) => Number(key.split(':')[1]));
-  xs.push(state.currentCell.x);
-  ys.push(state.currentCell.y);
-
-  const minX = Math.min(...xs) - 1;
-  const maxX = Math.max(...xs) + 1;
-  const minY = Math.max(0, Math.min(...ys) - 1);
-  const maxY = Math.max(...ys) + 1;
-
-  const cols = maxX - minX + 1;
-  const rows = maxY - minY + 1;
+  const size = 7;
+  const half = Math.floor(size / 2);
   const gap = 4;
-  const cellSize = Math.max(8, Math.floor(Math.min((width - 20) / cols, (height - 20) / rows) - gap));
+  const cellSize = Math.max(8, Math.floor(Math.min((width - 20) / size, (height - 20) / size) - gap));
   const pitch = cellSize + gap;
   const cells: MiniMapCell[] = [];
 
-  for (let y = maxY; y >= minY; y -= 1) {
-    for (let x = minX; x <= maxX; x += 1) {
+  for (let row = 0; row < size; row += 1) {
+    for (let col = 0; col < size; col += 1) {
+      const x = state.currentCell.x + col - half;
+      const y = state.currentCell.y + half - row;
       const key = `${x}:${y}`;
       const cell = state.cells[key];
       const remaining = cell ? cell.remaining[3] + cell.remaining[2] + cell.remaining[1] : 0;
       cells.push({
         key,
-        x: 10 + (x - minX) * pitch,
-        y: 10 + (maxY - y) * pitch,
+        x: 10 + col * pitch,
+        y: 10 + row * pitch,
         visited: cell?.visited ?? false,
         remaining,
         current: state.currentCell.x === x && state.currentCell.y === y,
