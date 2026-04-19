@@ -532,8 +532,28 @@ describe('game logic', () => {
     expect(state.asteroids).toHaveLength(0);
   });
 
-  it('reduces player hp and ends the run on lethal contact', () => {
+  it('respawns at the last cleared cell and keeps the map after lethal contact', () => {
     const state = createGameState(320, 240, 'CINDER-5D');
+    state.currentCell = { x: 2, y: 1 };
+    state.lastClearedCell = { x: 1, y: 0 };
+    state.cells[cellKey({ x: 1, y: 0 })] = {
+      kind: 'combat',
+      visited: true,
+      cleared: true,
+      remaining: { 3: 0, 2: 0, 1: 0 },
+    };
+    state.cells[cellKey({ x: 2, y: 1 })] = {
+      kind: 'combat',
+      visited: true,
+      cleared: false,
+      remaining: { 3: 1, 2: 0, 1: 0 },
+    };
+    state.cells[cellKey({ x: -1, y: 0 })] = {
+      kind: 'empty',
+      visited: true,
+      cleared: false,
+      remaining: { 3: 0, 2: 0, 1: 0 },
+    };
     state.ship.x = 120;
     state.ship.y = 120;
     state.ship.vx = 0;
@@ -559,9 +579,58 @@ describe('game logic', () => {
 
     updateGame(state, createInputState(), 0, 1000);
 
-    expect(state.player.hp).toBe(0);
-    expect(state.ship.alive).toBe(false);
-    expect(state.gameOver).toBe(true);
+    expect(state.player.hp).toBe(state.player.maxHp);
+    expect(state.ship.alive).toBe(true);
+    expect(state.gameOver).toBe(false);
+    expect(state.currentCell).toEqual({ x: 1, y: 0 });
+    expect(state.ship.x).toBe(160);
+    expect(state.ship.y).toBe(120);
+    expect(state.respawnBlinkUntil).toBeGreaterThan(1000);
+    expect(state.cells[cellKey({ x: 2, y: 1 })]?.remaining).toEqual({
+      3: 3,
+      2: 0,
+      1: 0,
+    });
+    expect(state.cells[cellKey({ x: -1, y: 0 })]).toBeTruthy();
+  });
+
+  it('falls back to the starting cell when no cells have been cleared yet', () => {
+    const state = createGameState(320, 240, 'CINDER-5D');
+    state.cells[cellKey(state.currentCell)] = {
+      kind: 'empty',
+      visited: true,
+      cleared: false,
+      remaining: { 3: 0, 2: 0, 1: 0 },
+    };
+    state.ship.x = 120;
+    state.ship.y = 120;
+    state.ship.vx = 0;
+    state.ship.vy = 0;
+    state.ship.alive = true;
+    state.ship.invulnerableUntil = 0;
+    state.player.hp = 1;
+    state.asteroids = [
+      {
+        x: 120,
+        y: 120,
+        vx: 0,
+        vy: 0,
+        size: 3,
+        radius: 56,
+        hp: 12,
+        maxHp: 12,
+        xpReward: 4,
+        contactDamage: 1,
+        hpVisible: false,
+      },
+    ];
+
+    updateGame(state, createInputState(), 0, 1000);
+
+    expect(state.currentCell).toEqual({ x: 0, y: 0 });
+    expect(state.player.hp).toBe(state.player.maxHp);
+    expect(state.ship.alive).toBe(true);
+    expect(state.respawnBlinkUntil).toBeGreaterThan(1000);
   });
 
   it('bounces the ship and a small asteroid off each other while still dealing contact damage', () => {
@@ -656,6 +725,7 @@ describe('game logic', () => {
       regenAccumulator: 0,
       spawnCounter: 0,
       gameOver: false,
+      lastClearedCell: { x: 1, y: 2 },
       cells: {
         '1:2': {
           kind: 'combat',
@@ -712,6 +782,7 @@ describe('game logic', () => {
       regenAccumulator: 0,
       spawnCounter: 0,
       gameOver: false,
+      lastClearedCell: { x: 1, y: 2 },
       cells: {
         '1:2': {
           kind: 'combat',
@@ -764,6 +835,7 @@ describe('game logic', () => {
       regenAccumulator: 0,
       spawnCounter: 0,
       gameOver: false,
+      lastClearedCell: { x: 0, y: 0 },
       cells: {
         '0:0': {
           kind: 'empty',

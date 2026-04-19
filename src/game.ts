@@ -62,12 +62,14 @@ export type GameState = {
   seed: string;
   slotIndex: SaveSlotIndex | null;
   currentCell: CellCoord;
+  lastClearedCell: CellCoord;
   cells: Record<string, CellState>;
   ship: Ship;
   bullets: Bullet[];
   asteroids: Asteroid[];
   player: PlayerStats;
   gameOver: boolean;
+  respawnBlinkUntil: number;
   width: number;
   height: number;
   nextShotAt: number;
@@ -123,6 +125,7 @@ type CreateGameStateOptions = {
   bullets?: Bullet[];
   asteroids?: Asteroid[];
   gameOver?: boolean;
+  lastClearedCell?: CellCoord;
   nextShotAt?: number;
   transitionCooldownUntil?: number;
   regenAccumulator?: number;
@@ -156,6 +159,7 @@ const PASSIVE_REGEN_INTERVAL_MS = 10000;
 const PASSIVE_REGEN_AMOUNT = 1;
 const WORLD_WIDTH = 7;
 const WORLD_MIN_Y = -4;
+const RESPAWN_BLINK_TIME = 3.5;
 
 const ASTEROID_RADIUS: Record<AsteroidSize, number> = {
   3: 56,
@@ -210,6 +214,11 @@ export function createGameState(
     seed: normalizeSeed(seed),
     slotIndex: options.slotIndex ?? null,
     currentCell: options.currentCell ? normalizeCellCoord(options.currentCell) : { x: 0, y: 0 },
+    lastClearedCell: options.lastClearedCell
+      ? normalizeCellCoord(options.lastClearedCell)
+      : options.currentCell
+        ? normalizeCellCoord(options.currentCell)
+        : { x: 0, y: 0 },
     cells: cloneCellStateMap(options.cells ?? {}),
     ship: {
       x: Math.floor(width / 2),
@@ -225,6 +234,7 @@ export function createGameState(
     asteroids: cloneAsteroids(options.asteroids ?? []),
     player: options.player ? { ...options.player } : createPlayerStats(),
     gameOver: options.gameOver ?? false,
+    respawnBlinkUntil: 0,
     width,
     height,
     nextShotAt: options.nextShotAt ?? 0,
@@ -251,13 +261,14 @@ export function hydrateGameState(
   return createGameState(width, height, snapshot.seed, {
     slotIndex: null,
     currentCell: snapshot.currentCell,
+    lastClearedCell: snapshot.lastClearedCell ?? snapshot.currentCell,
     player: snapshot.player,
     cells: snapshot.cells,
     ship: {
       ...snapshot.ship,
       invulnerableUntil: 0,
     },
-    gameOver: snapshot.gameOver,
+    gameOver: false,
     nextShotAt: 0,
     transitionCooldownUntil: 0,
     regenAccumulator: snapshot.regenAccumulator,
@@ -608,7 +619,9 @@ function resolveShipAsteroidContacts(state: GameState, now: number) {
         asteroid.radius,
         ASTEROID_MASS[asteroid.size],
       );
-      damagePlayer(state, asteroid.contactDamage, now);
+      if (damagePlayer(state, asteroid.contactDamage, now)) {
+        return;
+      }
     }
   }
 }
@@ -674,20 +687,18 @@ function getCellDelta(x: number, y: number, width: number, height: number) {
 
 function damagePlayer(state: GameState, amount: number, now: number) {
   if (!state.ship.alive || now < state.ship.invulnerableUntil) {
-    return;
+    return false;
   }
 
   state.player.hp = Math.max(0, state.player.hp - amount);
-  state.ship.invulnerableUntil = now + DAMAGE_INVULNERABILITY_TIME * 1000;
 
   if (state.player.hp <= 0) {
-    state.player.hp = 0;
-    state.ship.alive = false;
-    state.ship.vx = 0;
-    state.ship.vy = 0;
-    state.gameOver = true;
-    state.saveRequested = true;
+    respawnPlayer(state, now);
+    return true;
   }
+
+  state.ship.invulnerableUntil = now + DAMAGE_INVULNERABILITY_TIME * 1000;
+  return false;
 }
 
 function handleClearCell(state: GameState) {
@@ -697,6 +708,7 @@ function handleClearCell(state: GameState) {
   }
 
   cell.cleared = true;
+  state.lastClearedCell = { ...state.currentCell };
   cell.remaining = {
     3: 0,
     2: 0,
@@ -705,6 +717,25 @@ function handleClearCell(state: GameState) {
   state.player.hp = Math.min(state.player.maxHp, state.player.hp + CELL_CLEAR_HEAL);
   gainPlayerXp(state.player, CELL_CLEAR_XP);
   state.regenAccumulator = 0;
+  state.saveRequested = true;
+}
+
+function respawnPlayer(state: GameState, now: number) {
+  saveCurrentCellProgress(state);
+
+  const respawnCell = { ...state.lastClearedCell };
+  state.currentCell = respawnCell;
+  state.ship.x = Math.floor(state.width / 2);
+  state.ship.y = Math.floor(state.height / 2);
+  state.ship.vx = 0;
+  state.ship.vy = 0;
+  state.ship.alive = true;
+  state.ship.invulnerableUntil = now + RESPAWN_BLINK_TIME * 1000;
+  state.respawnBlinkUntil = state.ship.invulnerableUntil;
+  state.player.hp = state.player.maxHp;
+  state.bullets = [];
+  state.asteroids = [];
+  enterCell(state, state.currentCell, now, false);
   state.saveRequested = true;
 }
 

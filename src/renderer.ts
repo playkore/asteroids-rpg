@@ -29,7 +29,7 @@ export function drawGame(
   drawArenaFrame(ctx, width, height);
   drawAsteroids(ctx, state.asteroids);
   drawBullets(ctx, state.bullets);
-  drawShip(ctx, state.ship);
+  drawShip(ctx, state.ship, now, state.respawnBlinkUntil);
 }
 
 export function drawMiniMap(
@@ -145,8 +145,14 @@ function drawBullets(ctx: CanvasRenderingContext2D, bullets: Bullet[]) {
   }
 }
 
-function drawShip(ctx: CanvasRenderingContext2D, ship: Ship) {
+const RESPAWN_BLINK_PERIOD_MS = 180;
+
+function drawShip(ctx: CanvasRenderingContext2D, ship: Ship, now: number, respawnBlinkUntil: number) {
   if (!ship.alive) {
+    return;
+  }
+
+  if (now < respawnBlinkUntil && Math.floor(now / RESPAWN_BLINK_PERIOD_MS) % 2 === 1) {
     return;
   }
 

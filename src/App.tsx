@@ -22,7 +22,6 @@ export default function App() {
     pauseGame,
     openMenu,
     setMovement,
-    restartCurrentGame,
   } = useGameLoop();
 
   useEffect(() => {
@@ -99,20 +98,6 @@ export default function App() {
           saveBundle={saveBundle}
           paused={phase === 'paused'}
         />
-      ) : null}
-
-      {phase === 'gameover' ? (
-        <div className="overlay">
-          <div className="overlay__panel">
-            <h1>Game Over</h1>
-            <button className="overlay__button" type="button" onClick={restartCurrentGame}>
-              Restart
-            </button>
-            <button className="overlay__button" type="button" onClick={openMenu}>
-              Menu
-            </button>
-          </div>
-        </div>
       ) : null}
 
       {pendingOverwriteSlot !== null ? (

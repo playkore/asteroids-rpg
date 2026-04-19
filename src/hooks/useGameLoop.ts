@@ -408,13 +408,6 @@ export function useGameLoop() {
         persistCurrentRun();
       }
 
-      if (nextHud.gameOver) {
-        persistCurrentRun();
-        setPhase('gameover');
-        lastFrameRef.current = null;
-        return;
-      }
-
       rafRef.current = window.requestAnimationFrame(tick);
     };
 

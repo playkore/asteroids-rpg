@@ -78,6 +78,18 @@ describe('drawGame', () => {
     expect((ctx as any).lineWidths).toContain(1);
   });
 
+  it('hides the ship while it is blinking after a respawn', () => {
+    const ctx = createMockContext();
+    const state = createGameState(320, 240);
+    state.asteroids = [];
+    state.bullets = [];
+    state.respawnBlinkUntil = 1000;
+
+    drawGame(ctx, state, 180, 1, false);
+
+    expect(ctx.translate).not.toHaveBeenCalled();
+  });
+
   it('draws the mini-map with visited cells and a current cell marker', () => {
     const ctx = createMockContext();
     const state = createGameState(320, 240);

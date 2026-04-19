@@ -41,6 +41,7 @@ describe('save bundle', () => {
       regenAccumulator: 0,
       spawnCounter: 0,
       gameOver: false,
+      lastClearedCell: { x: 2, y: 3 },
       cells: {
         '2:3': {
           kind: 'empty',

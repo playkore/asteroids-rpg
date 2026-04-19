@@ -13,6 +13,10 @@ export type SaveSlotData = {
     x: number;
     y: number;
   };
+  lastClearedCell: {
+    x: number;
+    y: number;
+  };
   ship: Ship;
   player: PlayerStats;
   nextShotAt: number;
@@ -96,6 +100,10 @@ export function buildSaveSlotData(state: GameState, slot: SaveSlotIndex): SaveSl
     currentCell: {
       x: normalizeCellX(state.currentCell.x),
       y: state.currentCell.y,
+    },
+    lastClearedCell: {
+      x: normalizeCellX(state.lastClearedCell.x),
+      y: state.lastClearedCell.y,
     },
     ship: { ...state.ship },
     player: { ...state.player },
