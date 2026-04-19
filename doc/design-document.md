@@ -43,7 +43,7 @@ Working formula:
 
 - `cellLevel = y + 1`, assuming the starting row is `y = 0`.
 
-This formula is a draft and can be adjusted if the final map origin differs.
+This formula is fixed for the first version.
 
 ### 3.2 Cell Generation
 
@@ -55,6 +55,13 @@ When a cell is generated for the first time:
 If the cell contains asteroids:
 
 - Spawn `3` large asteroids.
+
+Generation is deterministic per save and seed:
+
+- The selected seed initializes world generation.
+- A cell's generated content is determined by `(seed, x, y)`.
+- The seed affects only world generation in the first version.
+- It does not affect player stats, controls, or combat rules.
 
 ### 3.3 Movement Between Cells
 
@@ -130,8 +137,6 @@ Let `attack` be the base attack value for the current cell.
 - Medium asteroid collision damage: `2 * attack`
 - Large asteroid collision damage: `3 * attack`
 
-The exact multipliers are still open to tuning.
-
 #### HP
 
 Asteroid HP depends on cell level and asteroid size.
@@ -150,22 +155,22 @@ Equivalent ratio:
 
 ### 5.2 Scaling by Cell Level
 
-The source text leaves open whether scaling should be linear or exponential.
+The first version uses simple linear scaling.
 
-This document records the requirement but does **not** lock the final formula yet:
+Base asteroid values by cell level:
 
-- `attack` increases with cell level.
-- Asteroid HP increases with cell level.
+- `baseAttack = cellLevel`
+- `largeAsteroidHP = 12 + 4 * (cellLevel - 1)`
+- `mediumAsteroidHP = largeAsteroidHP / 2`
+- `smallAsteroidHP = largeAsteroidHP / 4`
 
-Open balancing choice:
+Examples:
 
-- Linear growth: safer, easier to tune, longer progression runway.
-- Exponential growth: sharper difficulty spikes, higher risk of invalidating player growth.
+- Level 1 cell: large `12`, medium `6`, small `3`, base attack `1`
+- Level 2 cell: large `16`, medium `8`, small `4`, base attack `2`
+- Level 3 cell: large `20`, medium `10`, small `5`, base attack `3`
 
-Current recommendation:
-
-- Start with linear or gently super-linear scaling.
-- Avoid doubling per level unless the entire progression curve is built around short runs and aggressive failure.
+This keeps early progression readable and avoids sharp balance spikes.
 
 ## 6. Player Progression
 
@@ -182,7 +187,11 @@ The player has:
 - Destroying asteroids grants XP.
 - When accumulated XP exceeds a threshold, the player levels up.
 
-The exact XP values per asteroid size are not defined in the source text and remain a balancing task.
+XP rewards:
+
+- Small asteroid: `1 XP`
+- Medium asteroid: `2 XP`
+- Large asteroid: `4 XP`
 
 ### 6.2 Leveling
 
@@ -192,34 +201,45 @@ On level up:
 - Maximum HP increases.
 - Player damage increases.
 
+Starting player values:
+
+- Player level: `1`
+- Max HP: `10`
+- Current HP: `10`
+- Shot damage: `2`
+- Current XP: `0`
+
+Level-up curve:
+
+- `xpToNextLevel = 5 + 3 * (playerLevel - 1)`
+
+Stat growth per level:
+
+- `maxHP += 2`
+- `shotDamage += 1`
+
+On level up, current HP is fully restored to max HP.
+
 ### 6.3 Damage
 
 - Player damage is proportional to player level.
 - Each projectile hit removes HP from the asteroid.
 
-The exact formula for damage growth remains open.
+Fixed first-version formula:
+
+- `playerShotDamage = 2 + (playerLevel - 1)`
 
 ## 7. Damage Feedback
 
 After the first successful hit on an asteroid, the game should show its remaining HP.
 
-Two candidate approaches were identified:
+The first version uses a progress bar only.
 
-- Progress bar
-- Visual cracks on the asteroid sprite
+Rules:
 
-Recommendation:
-
-- Implement an HP bar first as the simplest readable solution.
-- Consider replacing or supplementing it later with visible cracks tied to HP thresholds.
-
-Possible crack thresholds:
-
-- Light damage
-- Medium damage
-- Heavy damage
-
-Exact thresholds are not yet fixed.
+- The HP bar is hidden until the asteroid receives its first hit.
+- After the first hit, the HP bar remains visible until the asteroid is destroyed.
+- Crack-based visuals are out of scope for the first version.
 
 ## 8. Cell Persistence
 
@@ -231,28 +251,26 @@ When a cell is fully cleared:
 
 ### 8.2 Partially Cleared Cells
 
-The source text explicitly raises an open question:
+If the player leaves a cell before clearing it, the game remembers remaining progress.
 
-- If the player leaves a cell before destroying all asteroids, should the game remember how many asteroids remain?
+Persistence model for the first version:
 
-This is not resolved yet.
+- Save whether the cell was visited.
+- Save whether the cell was initially empty.
+- Save whether the cell is fully cleared.
+- Save remaining asteroid counts by size:
+  - large
+  - medium
+  - small
 
-Possible persistence models:
+The game does not save exact asteroid positions, directions, or current HP.
 
-1. Full persistence
-   - Save every remaining asteroid with position, velocity, size, and HP.
-2. Partial persistence
-   - Save only remaining asteroid counts by size and regenerate positions on re-entry.
-3. No partial persistence
-   - Reset uncleared cells when re-entered.
+When the player re-enters a partially cleared cell:
 
-Current recommendation:
+- The remaining asteroids are respawned from the saved counts.
+- Their positions and velocities are regenerated.
 
-- Use partial persistence.
-
-Reason:
-
-- It preserves player progress without requiring full simulation snapshots.
+This keeps persistence simple while preserving player progress.
 
 ## 9. Rewards and Recovery
 
@@ -263,30 +281,25 @@ The source text leaves two systems open:
 
 ### 9.1 Clear Rewards
 
-Candidate reward types:
+Clearing a cell grants:
 
-- XP bonus
-- HP restoration
-- Other progression reward
+- `+3 XP`
+- Restore `2 HP`
 
-No final reward model is defined yet.
+If the player is already at max HP:
+
+- The HP reward is lost.
+
+No item drops, temporary buffs, or bonus reward systems are included in the first version.
 
 ### 9.2 HP Recovery
 
-Open options from the concept:
+The first version uses two HP recovery rules:
 
-- Slow passive regeneration over time
-- Recovery on cell clear
-- A combination of both
+- Passive regeneration: `1 HP` every `10` seconds while alive and below max HP
+- Cell clear bonus: restore `2 HP` immediately on clearing the cell
 
-Current recommendation:
-
-- Use slow background regeneration plus a small reward heal for clearing a cell.
-
-Reason:
-
-- Passive regen reduces dead-end runs.
-- Clear rewards create a meaningful payoff for finishing a fight.
+Passive regeneration stops at max HP.
 
 ## 10. Screens and Navigation
 
@@ -321,6 +334,9 @@ Starting or loading a game takes the player into cell combat.
 
 Combat UI includes at minimum:
 
+- Current HP / max HP
+- Player level
+- Current XP progress to next level
 - Button: return to menu
 - Button: open map
 
@@ -350,6 +366,11 @@ Additional note:
 - A cell may be empty from initial generation or become empty after the player destroys all asteroids.
 - In both cases, the mini-map should show that cell as white after it has been visited.
 
+The world is procedurally generated and unbounded for the first version.
+
+- The player can keep moving upward indefinitely.
+- Difficulty continues to increase through `cellLevel`.
+
 ## 12. Save System
 
 The game supports `3` save slots.
@@ -377,33 +398,23 @@ Basic flow:
 
 ## 14. Open Questions
 
-These items are explicitly unresolved in the source text and should be answered before implementation is finalized.
+There are no blocking design questions for the first version.
 
-1. How exactly should asteroid `attack` scale with cell level?
-   - Linear, exponential, or hybrid.
-2. How exactly should asteroid `HP` scale with cell level?
-3. Are the collision damage multipliers `1x / 2x / 3x` correct, or should they be tuned?
-4. How much XP does each asteroid size grant?
-5. What is the exact XP curve for player leveling?
-6. What is the exact player damage growth formula by level?
-7. How should partially cleared cells be persisted?
-8. What is the reward for clearing a cell?
-9. How does HP regeneration work exactly?
-10. Should asteroid HP be shown as a progress bar, cracks, or both?
-11. Is the world infinite upward, or should there be bounds?
-12. How should seed selection affect generation?
-   - Map layout, asteroid behavior, spawn patterns, or all of these?
+Future balancing and feature work can revisit:
+
+1. Whether partial persistence should also store asteroid HP.
+2. Whether HP bars should later be replaced with asteroid crack visuals.
+3. Whether clear rewards should expand beyond XP and HP.
+4. Whether the world should later gain special cell types instead of only empty/combat cells.
 
 ## 15. Recommended Next Decisions
 
-To move from concept to implementation, the next useful product decisions are:
+The design is implementation-ready for a first playable version.
 
-1. Lock the progression formulas:
-   - Cell attack scaling
-   - Cell HP scaling
-   - Player XP curve
-   - Player damage curve
-2. Lock persistence behavior for partially cleared cells.
-3. Lock the clear reward and HP recovery model.
-4. Lock the map generation rules tied to the seed.
-5. Lock the HP feedback style for damaged asteroids.
+Recommended next production steps:
+
+1. Implement deterministic cell generation from `seed + coordinates`.
+2. Implement combat using the fixed asteroid and player formulas in this document.
+3. Implement cell persistence using saved remaining asteroid counts.
+4. Implement save slots and autosave triggers.
+5. Implement the mini-map using the three fixed visual states.
