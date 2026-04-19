@@ -3,6 +3,7 @@ import FloatingControls from './components/FloatingControls';
 import Hud from './components/Hud';
 import OverwriteDialog from './components/OverwriteDialog';
 import StartScreen from './components/StartScreen';
+import { MENU_BUTTON_TOP } from './layout';
 import { useGameLoop } from './hooks/useGameLoop';
 import { generateSeed, normalizeSeed } from './seed';
 import type { SaveSlotIndex } from './save';
@@ -129,7 +130,7 @@ export default function App() {
       />
 
       {phase === 'playing' ? (
-        <button className="menu-button" type="button" onClick={pauseGame}>
+        <button className="menu-button" type="button" style={{ top: MENU_BUTTON_TOP }} onClick={pauseGame}>
           Menu
         </button>
       ) : null}

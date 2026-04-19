@@ -383,7 +383,6 @@ button {
 .menu-button {
   position: absolute;
   right: 14px;
-  top: calc(max(env(safe-area-inset-top), 14px) + 58px);
   border: var(--ui-line-width) solid var(--ui-line-color);
   border-radius: 999px;
   background: #090d13;
