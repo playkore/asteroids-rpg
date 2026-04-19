@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Asteroids RPG">
+  <rect width="512" height="512" fill="#05070c" />
+  <rect x="56" y="56" width="400" height="400" rx="64" fill="none" stroke="#f4fbff" stroke-width="24" />
+  <circle cx="356" cy="156" r="24" fill="none" stroke="#f4fbff" stroke-width="18" />
+  <circle cx="164" cy="348" r="18" fill="none" stroke="#f4fbff" stroke-width="18" />
+  <path d="M256 132 L320 260 L256 244 L192 260 Z" fill="none" stroke="#f4fbff" stroke-width="18" stroke-linejoin="round" stroke-linecap="round" />
+</svg>
