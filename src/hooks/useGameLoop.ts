@@ -27,6 +27,7 @@ import {
   writeSaveBundle,
 } from '../save';
 import { drawGame, drawMiniMap } from '../renderer';
+import { getGameCanvasLayout } from '../layout';
 import type { JoystickVector } from './useJoystickInput';
 
 const INITIAL_HUD: HudState = {
@@ -93,13 +94,18 @@ export function useGameLoop() {
     const width = window.innerWidth;
     const height = window.innerHeight;
     const dpr = window.devicePixelRatio || 1;
-    canvas.width = Math.floor(width * dpr);
-    canvas.height = Math.floor(height * dpr);
-    canvas.style.width = `${width}px`;
-    canvas.style.height = `${height}px`;
+    const layout = getGameCanvasLayout(width, height);
+    canvas.width = Math.floor(layout.size * dpr);
+    canvas.height = Math.floor(layout.size * dpr);
+    canvas.style.top = `${layout.top}px`;
+    canvas.style.left = `${layout.left}px`;
+    canvas.style.right = 'auto';
+    canvas.style.bottom = 'auto';
+    canvas.style.width = `${layout.size}px`;
+    canvas.style.height = `${layout.size}px`;
 
     if (gameRef.current) {
-      resizeGameState(gameRef.current, width, height);
+      resizeGameState(gameRef.current, layout.size, layout.size);
     }
 
     const miniMapCanvas = miniMapRef.current;

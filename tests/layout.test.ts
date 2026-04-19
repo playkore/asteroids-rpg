@@ -1,8 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { MENU_BUTTON_TOP } from '../src/layout';
+import { GAME_FIELD_LEFT, GAME_FIELD_TOP, MENU_BUTTON_TOP, getGameCanvasLayout } from '../src/layout';
 
 describe('layout', () => {
   it('keeps the menu button below the HUD', () => {
     expect(MENU_BUTTON_TOP).toContain('132px');
+  });
+
+  it('creates a square game field below the HUD', () => {
+    const layout = getGameCanvasLayout(1280, 900);
+
+    expect(layout.top).toBe(GAME_FIELD_TOP);
+    expect(layout.left).toBe(GAME_FIELD_LEFT);
+    expect(layout.size).toBe(750);
   });
 });
