@@ -1,15 +1,43 @@
+import type { SaveBundle, SaveSlotIndex } from '../save';
+
 type StartScreenProps = {
   seed: string;
   onSeedChange: (value: string) => void;
   onRoll: () => void;
-  onStart: () => void;
+  onContinue: () => void;
+  onNewGame: (slot: SaveSlotIndex) => void;
+  onLoadGame: (slot: SaveSlotIndex) => void;
+  onResume?: () => void;
+  paused: boolean;
+  saveBundle: SaveBundle;
 };
 
-export default function StartScreen({ seed, onSeedChange, onRoll, onStart }: StartScreenProps) {
+function formatSlotLabel(slot: SaveBundle['slots'][number], index: number) {
+  if (!slot) {
+    return `Slot ${index + 1} · Empty`;
+  }
+
+  const cell = `${slot.currentCell.x},${slot.currentCell.y}`;
+  return `Slot ${index + 1} · ${slot.seed} · Cell ${cell}`;
+}
+
+export default function StartScreen({
+  seed,
+  onSeedChange,
+  onRoll,
+  onContinue,
+  onNewGame,
+  onLoadGame,
+  onResume,
+  paused,
+  saveBundle,
+}: StartScreenProps) {
+  const canContinue = saveBundle.lastSlot !== null && Boolean(saveBundle.slots[saveBundle.lastSlot]);
+
   return (
     <div className="start-screen">
       <div className="start-screen__panel">
-        <h1>Asteroids RPG</h1>
+        <h1>{paused ? 'Paused' : 'Asteroids RPG'}</h1>
         <label className="start-screen__seed" htmlFor="seed-input">
           <span>Seed</span>
           <input
@@ -28,9 +56,54 @@ export default function StartScreen({ seed, onSeedChange, onRoll, onStart }: Sta
           <button className="overlay__button" type="button" onClick={onRoll}>
             Roll
           </button>
-          <button className="overlay__button start-screen__primary" type="button" onClick={onStart}>
-            Start Adventure
+          <button
+            className="overlay__button start-screen__primary"
+            type="button"
+            onClick={onContinue}
+            disabled={!canContinue}
+          >
+            Continue
           </button>
+          {onResume ? (
+            <button className="overlay__button start-screen__primary" type="button" onClick={onResume}>
+              Resume
+            </button>
+          ) : null}
+        </div>
+
+        <div className="start-screen__slots">
+          <div className="start-screen__group">
+            <h2>New Game</h2>
+            <div className="start-screen__slot-list">
+              {saveBundle.slots.map((slot, index) => (
+                <button
+                  key={`new-${index}`}
+                  className="overlay__button start-screen__slot-button"
+                  type="button"
+                  onClick={() => onNewGame(index as SaveSlotIndex)}
+                >
+                  {formatSlotLabel(slot, index)}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="start-screen__group">
+            <h2>Load Game</h2>
+            <div className="start-screen__slot-list">
+              {saveBundle.slots.map((slot, index) => (
+                <button
+                  key={`load-${index}`}
+                  className="overlay__button start-screen__slot-button"
+                  type="button"
+                  onClick={() => onLoadGame(index as SaveSlotIndex)}
+                  disabled={!slot}
+                >
+                  {formatSlotLabel(slot, index)}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     </div>

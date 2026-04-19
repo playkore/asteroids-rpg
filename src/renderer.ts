@@ -8,7 +8,7 @@ type AsteroidPoint = {
 
 const ASTEROID_SHAPE_CACHE: Partial<Record<number, AsteroidPoint[]>> = {};
 const GRID_LINE_WIDTH = 1;
-const GRID_SPACING = 120;
+const GRID_SPACING = 84;
 const GRID_COLOR = '#232a33';
 
 export function drawGame(
@@ -19,29 +19,16 @@ export function drawGame(
   flameVisible: boolean,
 ) {
   const { width, height } = state;
-  const cameraX = state.ship.x - width / 2;
-  const cameraY = state.ship.y - height / 2;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, width, height);
-
   ctx.fillStyle = '#05070c';
   ctx.fillRect(0, 0, width, height);
 
-  ctx.save();
-  ctx.translate(-cameraX, -cameraY);
-  beginCavePath(ctx, state.cave);
-  ctx.clip();
-  drawBackgroundGrid(ctx, cameraX, cameraY, width, height);
-  ctx.restore();
-
-  ctx.save();
-  ctx.translate(-cameraX, -cameraY);
-  drawCave(ctx, state.cave);
-  drawPortals(ctx, state.portals);
+  drawBackgroundGrid(ctx, width, height);
+  drawArenaFrame(ctx, width, height);
   drawAsteroids(ctx, state.asteroids);
   drawBullets(ctx, state.bullets);
   drawShip(ctx, state.ship, flameVisible);
-  ctx.restore();
 }
 
 export function drawMiniMap(
@@ -51,13 +38,7 @@ export function drawMiniMap(
   width: number,
   height: number,
 ) {
-  const worldSpan = Math.max(state.width, state.height) * 2;
-  const padding = 12;
-  const scale = Math.min((width - padding * 2) / worldSpan, (height - padding * 2) / worldSpan);
-  const centerX = width / 2;
-  const centerY = height / 2;
-  const toMiniX = (value: number) => centerX + (value - state.ship.x) * scale;
-  const toMiniY = (value: number) => centerY + (value - state.ship.y) * scale;
+  const layout = buildMiniMapLayout(state, width, height);
 
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, width, height);
@@ -67,67 +48,42 @@ export function drawMiniMap(
   ctx.lineWidth = UI_LINE_WIDTH;
   ctx.strokeRect(0, 0, width, height);
 
-  ctx.save();
-  ctx.beginPath();
-  ctx.rect(0, 0, width, height);
-  ctx.clip();
+  for (const cell of layout.cells) {
+    const fill = cell.visited ? '#f5f9ff' : '#05070c';
+    ctx.fillStyle = fill;
+      ctx.fillRect(cell.x, cell.y, layout.cellSize, layout.cellSize);
+    ctx.strokeStyle = cell.current ? '#f5f9ff' : '#8f99a6';
+    ctx.lineWidth = cell.current ? UI_LINE_WIDTH : 1.5;
+    ctx.strokeRect(cell.x, cell.y, layout.cellSize, layout.cellSize);
 
-  drawMiniMapCave(ctx, state.cave, toMiniX, toMiniY);
-  drawMiniMapAsteroids(ctx, state.asteroids, toMiniX, toMiniY);
-  drawMiniMapShip(ctx, centerX, centerY);
-
-  ctx.restore();
+    if (cell.visited && cell.remaining > 0) {
+      ctx.fillStyle = '#05070c';
+      ctx.beginPath();
+      ctx.arc(cell.x + layout.cellSize / 2, cell.y + layout.cellSize / 2, 2.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
 }
 
-function drawCave(ctx: CanvasRenderingContext2D, cave: { x: number; y: number }[]) {
-  beginCavePath(ctx, cave);
-
+function drawArenaFrame(ctx: CanvasRenderingContext2D, width: number, height: number) {
   ctx.strokeStyle = UI_LINE_COLOR;
   ctx.lineWidth = UI_LINE_WIDTH;
-  ctx.stroke();
+  ctx.strokeRect(0, 0, width, height);
 }
 
-function beginCavePath(ctx: CanvasRenderingContext2D, cave: { x: number; y: number }[]) {
-  if (cave.length === 0) {
-    return;
-  }
-
-  const first = cave[0]!;
-  ctx.beginPath();
-  ctx.moveTo(first.x, first.y);
-  for (let i = 1; i < cave.length; i += 1) {
-    const point = cave[i]!;
-    ctx.lineTo(point.x, point.y);
-  }
-  ctx.closePath();
-}
-
-function drawBackgroundGrid(
-  ctx: CanvasRenderingContext2D,
-  cameraX: number,
-  cameraY: number,
-  width: number,
-  height: number,
-) {
-  const left = cameraX - GRID_SPACING;
-  const top = cameraY - GRID_SPACING;
-  const right = cameraX + width + GRID_SPACING;
-  const bottom = cameraY + height + GRID_SPACING;
-  const startX = Math.floor(left / GRID_SPACING) * GRID_SPACING;
-  const startY = Math.floor(top / GRID_SPACING) * GRID_SPACING;
-
+function drawBackgroundGrid(ctx: CanvasRenderingContext2D, width: number, height: number) {
   ctx.strokeStyle = GRID_COLOR;
   ctx.lineWidth = GRID_LINE_WIDTH;
   ctx.beginPath();
 
-  for (let x = startX; x <= right; x += GRID_SPACING) {
-    ctx.moveTo(x, top);
-    ctx.lineTo(x, bottom);
+  for (let x = 0; x <= width; x += GRID_SPACING) {
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, height);
   }
 
-  for (let y = startY; y <= bottom; y += GRID_SPACING) {
-    ctx.moveTo(left, y);
-    ctx.lineTo(right, y);
+  for (let y = 0; y <= height; y += GRID_SPACING) {
+    ctx.moveTo(0, y);
+    ctx.lineTo(width, y);
   }
 
   ctx.stroke();
@@ -143,22 +99,29 @@ function drawAsteroids(ctx: CanvasRenderingContext2D, asteroids: Asteroid[]) {
     ctx.strokeStyle = UI_LINE_COLOR;
     ctx.lineWidth = UI_LINE_WIDTH;
     ctx.stroke();
+
+    if (asteroid.hpVisible) {
+      drawAsteroidHp(ctx, asteroid);
+    }
+
     ctx.restore();
   }
 }
 
-function drawPortals(ctx: CanvasRenderingContext2D, portals: { x: number; y: number }[]) {
-  if (portals.length === 0) {
-    return;
-  }
+function drawAsteroidHp(ctx: CanvasRenderingContext2D, asteroid: Asteroid) {
+  const width = asteroid.radius * 1.2;
+  const height = 6;
+  const x = -width / 2;
+  const y = -asteroid.radius - 14;
+  const fill = Math.max(0, Math.min(1, asteroid.hp / asteroid.maxHp));
 
+  ctx.fillStyle = '#05070c';
+  ctx.fillRect(x, y, width, height);
   ctx.strokeStyle = UI_LINE_COLOR;
-  ctx.lineWidth = UI_LINE_WIDTH;
-  for (const deadEnd of portals) {
-    ctx.beginPath();
-    ctx.arc(deadEnd.x, deadEnd.y, 10, 0, Math.PI * 2);
-    ctx.stroke();
-  }
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(x, y, width, height);
+  ctx.fillStyle = UI_LINE_COLOR;
+  ctx.fillRect(x + 1, y + 1, Math.max(0, (width - 2) * fill), height - 2);
 }
 
 function drawBullets(ctx: CanvasRenderingContext2D, bullets: Bullet[]) {
@@ -198,40 +161,6 @@ function drawShip(ctx: CanvasRenderingContext2D, ship: Ship, flameVisible: boole
   ctx.restore();
 }
 
-function drawMiniMapCave(
-  ctx: CanvasRenderingContext2D,
-  cave: { x: number; y: number }[],
-  toMiniX: (value: number) => number,
-  toMiniY: (value: number) => number,
-) {
-  if (cave.length === 0) {
-    return;
-  }
-
-  const first = cave[0]!;
-  ctx.beginPath();
-  ctx.moveTo(toMiniX(first.x), toMiniY(first.y));
-  for (let i = 1; i < cave.length; i += 1) {
-    const point = cave[i]!;
-    ctx.lineTo(toMiniX(point.x), toMiniY(point.y));
-  }
-  ctx.closePath();
-  ctx.stroke();
-}
-
-function drawMiniMapAsteroids(
-  ctx: CanvasRenderingContext2D,
-  asteroids: Asteroid[],
-  toMiniX: (value: number) => number,
-  toMiniY: (value: number) => number,
-) {
-  for (const asteroid of asteroids) {
-    ctx.beginPath();
-    ctx.arc(toMiniX(asteroid.x), toMiniY(asteroid.y), 2.5, 0, Math.PI * 2);
-    ctx.stroke();
-  }
-}
-
 function beginAsteroidPath(ctx: CanvasRenderingContext2D, asteroid: Asteroid) {
   const points = asteroidShape(asteroid.radius);
   ctx.beginPath();
@@ -244,13 +173,6 @@ function beginAsteroidPath(ctx: CanvasRenderingContext2D, asteroid: Asteroid) {
   ctx.closePath();
 }
 
-function drawMiniMapShip(ctx: CanvasRenderingContext2D, centerX: number, centerY: number) {
-  ctx.fillStyle = UI_LINE_COLOR;
-  ctx.beginPath();
-  ctx.arc(centerX, centerY, 2.5, 0, Math.PI * 2);
-  ctx.fill();
-}
-
 export function asteroidShape(radius: number) {
   const cached = ASTEROID_SHAPE_CACHE[radius];
   if (cached) {
@@ -258,11 +180,60 @@ export function asteroidShape(radius: number) {
   }
 
   const segments = 9;
-  const points = Array.from({ length: segments }, (_, index) => {
-    const angle = (index / segments) * Math.PI * 2;
-    const distance = 0.78 + 0.27 * Math.sin(radius * 0.11 + index * 2.1);
-    return { angle, distance };
-  });
+  const points: AsteroidPoint[] = [];
+  for (let index = 0; index < segments; index += 1) {
+    points.push({
+      angle: (index / segments) * Math.PI * 2,
+      distance: 0.78 + ((radius * 13 + index * 17) % 11) / 30,
+    });
+  }
   ASTEROID_SHAPE_CACHE[radius] = points;
   return points;
+}
+
+type MiniMapCell = {
+  key: string;
+  x: number;
+  y: number;
+  visited: boolean;
+  remaining: number;
+  current: boolean;
+};
+
+function buildMiniMapLayout(state: GameState, width: number, height: number) {
+  const cellKeys = Object.keys(state.cells);
+  const xs = cellKeys.map((key) => Number(key.split(':')[0]));
+  const ys = cellKeys.map((key) => Number(key.split(':')[1]));
+  xs.push(state.currentCell.x);
+  ys.push(state.currentCell.y);
+
+  const minX = Math.min(...xs) - 1;
+  const maxX = Math.max(...xs) + 1;
+  const minY = Math.min(...ys) - 1;
+  const maxY = Math.max(...ys) + 1;
+
+  const cols = maxX - minX + 1;
+  const rows = maxY - minY + 1;
+  const gap = 4;
+  const cellSize = Math.max(8, Math.floor(Math.min((width - 20) / cols, (height - 20) / rows) - gap));
+  const pitch = cellSize + gap;
+  const cells: MiniMapCell[] = [];
+
+  for (let y = maxY; y >= minY; y -= 1) {
+    for (let x = minX; x <= maxX; x += 1) {
+      const key = `${x}:${y}`;
+      const cell = state.cells[key];
+      const remaining = cell ? cell.remaining[3] + cell.remaining[2] + cell.remaining[1] : 0;
+      cells.push({
+        key,
+        x: 10 + (x - minX) * pitch,
+        y: 10 + (maxY - y) * pitch,
+        visited: cell?.visited ?? false,
+        remaining,
+        current: state.currentCell.x === x && state.currentCell.y === y,
+      });
+    }
+  }
+
+  return { cells, cellSize };
 }

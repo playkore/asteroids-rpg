@@ -10,18 +10,18 @@ export function createPlayerStats(): PlayerStats {
   return {
     level: 1,
     xp: 0,
-    hp: 60,
-    maxHp: 60,
-    attack: 9,
+    hp: 10,
+    maxHp: 10,
+    attack: 2,
   };
 }
 
-export function xpForLevel(level: number) {
-  return Math.round(10 + 4 * (level - 1) ** 2 + 2 * (level - 1));
+export function xpToNextLevel(level: number) {
+  return 5 + 3 * (level - 1);
 }
 
-export function xpToNextLevel(level: number) {
-  return 28 + level * 20;
+export function playerShotDamage(level: number) {
+  return 2 + (level - 1);
 }
 
 export function gainPlayerXp(player: PlayerStats, amount: number) {
@@ -32,8 +32,8 @@ export function gainPlayerXp(player: PlayerStats, amount: number) {
     const required = xpToNextLevel(player.level);
     player.xp -= required;
     player.level += 1;
-    player.maxHp += 14;
-    player.attack += 3;
+    player.maxHp += 2;
+    player.attack = playerShotDamage(player.level);
     player.hp = player.maxHp;
     leveledUp = true;
   }

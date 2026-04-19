@@ -40,8 +40,11 @@ export default function Hud({ hud }: { hud: HudState }) {
       </div>
       <div className="hud__pill hud__pill--seed">
         <span>
-          Seed · Lv {hud.player.level} · ATK {hud.player.attack}
+          Lv {hud.player.level} · ATK {hud.player.attack}
         </span>
+        <strong>
+          Cell {hud.cell.x}, {hud.cell.y} · L{hud.cellLevel}
+        </strong>
         <button className="hud__seed-button" type="button" onClick={() => void copySeed()}>
           {hud.seed}
         </button>

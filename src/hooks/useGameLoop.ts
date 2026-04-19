@@ -1,15 +1,32 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  buildHudState,
+  buildMapState,
   createGameState,
   createInputState,
+  hydrateGameState,
+  prepareGameStateForSave,
   resizeGameState,
   restartGame as resetGameState,
   updateGame,
+  type GamePhase,
+  type GameState,
   type HudState,
   type InputState,
   type MapState,
 } from '../game';
 import { createPlayerStats } from '../rpg';
+import {
+  buildSaveSlotData,
+  createEmptySaveBundle,
+  isSaveSlotIndex,
+  readSaveBundle,
+  setSaveSlot,
+  type SaveBundle,
+  type SaveSlotData,
+  type SaveSlotIndex,
+  writeSaveBundle,
+} from '../save';
 import { drawGame, drawMiniMap } from '../renderer';
 import type { JoystickVector } from './useJoystickInput';
 
@@ -18,12 +35,34 @@ const INITIAL_HUD: HudState = {
   seed: '',
   gameOver: false,
   ready: false,
+  cell: { x: 0, y: 0 },
+  cellLevel: 1,
+  slotIndex: null,
 };
 
-export function useGameLoop(paused: boolean, started: boolean, seed: string) {
+function getStorage() {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+  return window.localStorage;
+}
+
+function createPausedInput() {
+  const input = createInputState();
+  input.keyboard.left = false;
+  input.keyboard.right = false;
+  input.keyboard.up = false;
+  input.keyboard.down = false;
+  input.keyboard.shoot = false;
+  input.shootHeld = false;
+  input.shootRequested = false;
+  return input;
+}
+
+export function useGameLoop() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const miniMapRef = useRef<HTMLCanvasElement | null>(null);
-  const gameRef = useRef<ReturnType<typeof createGameState> | null>(null);
+  const gameRef = useRef<GameState | null>(null);
   const inputRef = useRef<InputState>(createInputState());
   const movementRef = useRef<JoystickVector>({
     x: 0,
@@ -35,31 +74,49 @@ export function useGameLoop(paused: boolean, started: boolean, seed: string) {
   const rafRef = useRef<number | null>(null);
   const lastFrameRef = useRef<number | null>(null);
   const [hud, setHud] = useState<HudState>(INITIAL_HUD);
-  const mapState: MapState | null = gameRef.current
-    ? {
-        rootSeed: gameRef.current.rootSeed,
-        currentNode: gameRef.current.currentNode,
-        nodeHistory: gameRef.current.nodeHistory,
-        graph: gameRef.current.graph,
-      }
-    : null;
+  const [phase, setPhase] = useState<GamePhase>('menu');
+  const [mapOpen, setMapOpen] = useState(false);
+  const [saveBundle, setSaveBundle] = useState<SaveBundle>(() => {
+    const storage = getStorage();
+    return storage ? readSaveBundle(storage) : createEmptySaveBundle();
+  });
 
-  const initializeGame = useCallback(() => {
-    gameRef.current = createGameState(window.innerWidth, window.innerHeight, seed);
-    setHud({
-      player: { ...gameRef.current.player },
-      seed: gameRef.current.seed,
-      gameOver: gameRef.current.gameOver,
-      ready: !gameRef.current.gameOver && gameRef.current.ship.alive,
-    });
-  }, [seed]);
+  const activeSlot = gameRef.current?.slotIndex ?? null;
+  const mapState: MapState | null = gameRef.current ? buildMapState(gameRef.current) : null;
+
+  const syncCanvasSize = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) {
+      return;
+    }
+
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = Math.floor(width * dpr);
+    canvas.height = Math.floor(height * dpr);
+    canvas.style.width = `${width}px`;
+    canvas.style.height = `${height}px`;
+
+    if (gameRef.current) {
+      resizeGameState(gameRef.current, width, height);
+    }
+
+    const miniMapCanvas = miniMapRef.current;
+    if (miniMapCanvas) {
+      miniMapCanvas.width = Math.floor(miniMapCanvas.clientWidth * dpr);
+      miniMapCanvas.height = Math.floor(miniMapCanvas.clientHeight * dpr);
+    }
+  }, []);
 
   const drawCurrentFrame = useCallback(() => {
-    if (!gameRef.current) {
+    const game = gameRef.current;
+    if (!game) {
       return;
     }
 
     const canvas = canvasRef.current;
+    const miniMapCanvas = miniMapRef.current;
     if (!canvas) {
       return;
     }
@@ -71,19 +128,18 @@ export function useGameLoop(paused: boolean, started: boolean, seed: string) {
 
     drawGame(
       ctx,
-      gameRef.current,
+      game,
       performance.now(),
       window.devicePixelRatio || 1,
       movementRef.current.active || inputRef.current.keyboard.up,
     );
 
-    const miniMapCanvas = miniMapRef.current;
     if (miniMapCanvas) {
       const miniCtx = miniMapCanvas.getContext('2d');
       if (miniCtx) {
         drawMiniMap(
           miniCtx,
-          gameRef.current,
+          game,
           window.devicePixelRatio || 1,
           miniMapCanvas.clientWidth,
           miniMapCanvas.clientHeight,
@@ -92,29 +148,190 @@ export function useGameLoop(paused: boolean, started: boolean, seed: string) {
     }
   }, []);
 
-  const setMovement = useCallback((movement: JoystickVector) => {
-    movementRef.current = movement;
-  }, []);
-
-  const restartGame = useCallback(() => {
-    if (!gameRef.current) {
-      initializeGame();
-      drawCurrentFrame();
+  const persistCurrentRun = useCallback(() => {
+    const game = gameRef.current;
+    if (!game || !isSaveSlotIndex(game.slotIndex ?? -1)) {
       return;
     }
 
-    resetGameState(gameRef.current);
+    const slot = game.slotIndex as SaveSlotIndex;
+    prepareGameStateForSave(game);
+    const storage = getStorage();
+    const nextData: SaveSlotData = buildSaveSlotData(game, slot);
+    setSaveBundle((current) => {
+      const nextBundle = setSaveSlot(current, slot, nextData);
+      if (storage) {
+        writeSaveBundle(storage, nextBundle);
+      }
+      return nextBundle;
+    });
+    game.saveRequested = false;
+  }, []);
+
+  const applyLoadedSave = useCallback((slot: SaveSlotIndex, snapshot: SaveSlotData) => {
+    gameRef.current = hydrateGameState(snapshot);
+    gameRef.current.slotIndex = slot;
     inputRef.current = createInputState();
-    movementRef.current = { x: 0, y: 0, centerX: 0, centerY: 0, active: false };
+    movementRef.current = {
+      x: 0,
+      y: 0,
+      centerX: 0,
+      centerY: 0,
+      active: false,
+    };
     lastFrameRef.current = null;
-    setHud({
-      player: { ...gameRef.current.player },
-      seed: gameRef.current.seed,
-      gameOver: gameRef.current.gameOver,
-      ready: !gameRef.current.gameOver && gameRef.current.ship.alive,
+    setHud(buildHudState(gameRef.current, true));
+    setPhase('playing');
+    setMapOpen(false);
+    const storage = getStorage();
+    setSaveBundle((current) => {
+      const nextBundle = {
+        ...current,
+        lastSlot: slot,
+        slots: current.slots.slice(),
+      };
+      nextBundle.slots[slot] = snapshot;
+      if (storage) {
+        writeSaveBundle(storage, nextBundle);
+      }
+      return nextBundle;
     });
     drawCurrentFrame();
-  }, [drawCurrentFrame, initializeGame]);
+  }, [drawCurrentFrame]);
+
+  const startNewGame = useCallback((seed: string, slot: SaveSlotIndex) => {
+    const game = createGameState(window.innerWidth, window.innerHeight, seed, {
+      slotIndex: slot,
+    });
+    gameRef.current = game;
+    inputRef.current = createInputState();
+    movementRef.current = {
+      x: 0,
+      y: 0,
+      centerX: 0,
+      centerY: 0,
+      active: false,
+    };
+    lastFrameRef.current = null;
+    setHud(buildHudState(game, true));
+    setPhase('playing');
+    setMapOpen(false);
+    const storage = getStorage();
+    const nextData = buildSaveSlotData(game, slot);
+    setSaveBundle((current) => {
+      const nextBundle = setSaveSlot(current, slot, nextData);
+      if (storage) {
+        writeSaveBundle(storage, nextBundle);
+      }
+      return nextBundle;
+    });
+    drawCurrentFrame();
+  }, [drawCurrentFrame]);
+
+  const continueGame = useCallback(() => {
+    const slot = saveBundle.lastSlot;
+    if (slot === null) {
+      return;
+    }
+    const snapshot = saveBundle.slots[slot];
+    if (!snapshot) {
+      return;
+    }
+    applyLoadedSave(slot, snapshot);
+  }, [applyLoadedSave, saveBundle]);
+
+  const loadGame = useCallback((slot: SaveSlotIndex) => {
+    const snapshot = saveBundle.slots[slot];
+    if (!snapshot) {
+      return;
+    }
+    applyLoadedSave(slot, snapshot);
+  }, [applyLoadedSave, saveBundle]);
+
+  const pauseGame = useCallback(() => {
+    if (phase !== 'playing') {
+      return;
+    }
+    persistCurrentRun();
+    setPhase('paused');
+    setMapOpen(false);
+    inputRef.current = createPausedInput();
+    lastFrameRef.current = null;
+    drawCurrentFrame();
+  }, [drawCurrentFrame, phase, persistCurrentRun]);
+
+  const resumeGame = useCallback(() => {
+    if (!gameRef.current || phase !== 'paused') {
+      return;
+    }
+    setPhase('playing');
+    lastFrameRef.current = null;
+    drawCurrentFrame();
+  }, [drawCurrentFrame, phase]);
+
+  const openMenu = useCallback(() => {
+    if (phase === 'playing') {
+      pauseGame();
+      return;
+    }
+    setMapOpen(false);
+    setPhase('menu');
+    lastFrameRef.current = null;
+    drawCurrentFrame();
+  }, [drawCurrentFrame, pauseGame, phase]);
+
+  const openMap = useCallback(() => {
+    if (phase !== 'playing') {
+      return;
+    }
+    persistCurrentRun();
+    setMapOpen(true);
+    setPhase('paused');
+    lastFrameRef.current = null;
+    drawCurrentFrame();
+  }, [drawCurrentFrame, phase, persistCurrentRun]);
+
+  const closeMap = useCallback(() => {
+    if (!mapOpen) {
+      return;
+    }
+    setMapOpen(false);
+    if (gameRef.current && phase === 'paused') {
+      setPhase('playing');
+      lastFrameRef.current = null;
+      drawCurrentFrame();
+    }
+  }, [drawCurrentFrame, mapOpen, phase]);
+
+  const toggleMap = useCallback(() => {
+    if (mapOpen) {
+      closeMap();
+    } else {
+      openMap();
+    }
+  }, [closeMap, mapOpen, openMap]);
+
+  const restartCurrentGame = useCallback(() => {
+    if (!gameRef.current) {
+      return;
+    }
+    resetGameState(gameRef.current);
+    gameRef.current.slotIndex = activeSlot;
+    inputRef.current = createInputState();
+    movementRef.current = {
+      x: 0,
+      y: 0,
+      centerX: 0,
+      centerY: 0,
+      active: false,
+    };
+    lastFrameRef.current = null;
+    setHud(buildHudState(gameRef.current, true));
+    setPhase('playing');
+    setMapOpen(false);
+    persistCurrentRun();
+    drawCurrentFrame();
+  }, [drawCurrentFrame, persistCurrentRun]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -123,23 +340,7 @@ export function useGameLoop(paused: boolean, started: boolean, seed: string) {
     }
 
     const resize = () => {
-      const width = window.innerWidth;
-      const height = window.innerHeight;
-      const dpr = window.devicePixelRatio || 1;
-      canvas.width = Math.floor(width * dpr);
-      canvas.height = Math.floor(height * dpr);
-      canvas.style.width = `${width}px`;
-      canvas.style.height = `${height}px`;
-      if (gameRef.current) {
-        resizeGameState(gameRef.current, width, height);
-      }
-
-      const miniMapCanvas = miniMapRef.current;
-      if (miniMapCanvas) {
-        miniMapCanvas.width = Math.floor(miniMapCanvas.clientWidth * dpr);
-        miniMapCanvas.height = Math.floor(miniMapCanvas.clientHeight * dpr);
-      }
-
+      syncCanvasSize();
       drawCurrentFrame();
     };
 
@@ -148,7 +349,7 @@ export function useGameLoop(paused: boolean, started: boolean, seed: string) {
     return () => {
       window.removeEventListener('resize', resize);
     };
-  }, [drawCurrentFrame]);
+  }, [drawCurrentFrame, syncCanvasSize]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -178,25 +379,17 @@ export function useGameLoop(paused: boolean, started: boolean, seed: string) {
   }, []);
 
   useEffect(() => {
-    if (!started) {
-      gameRef.current = null;
+    if (phase !== 'playing' || !gameRef.current) {
       lastFrameRef.current = null;
-      setHud(INITIAL_HUD);
-      drawCurrentFrame();
-      return;
-    }
-
-    if (!gameRef.current) {
-      initializeGame();
-    }
-
-    if (paused || gameRef.current?.gameOver) {
-      lastFrameRef.current = null;
-      drawCurrentFrame();
       return;
     }
 
     const tick = (now: number) => {
+      const game = gameRef.current;
+      if (!game || phase !== 'playing') {
+        return;
+      }
+
       const last = lastFrameRef.current ?? now;
       const dt = Math.min((now - last) / 1000, 0.033);
       lastFrameRef.current = now;
@@ -204,15 +397,16 @@ export function useGameLoop(paused: boolean, started: boolean, seed: string) {
       const input = inputRef.current;
       input.moveX = movementRef.current.active ? movementRef.current.x : 0;
       input.moveY = movementRef.current.active ? movementRef.current.y : 0;
-      input.shootRequested = !gameRef.current?.gameOver;
-      const flameVisible = movementRef.current.active || input.keyboard.up;
+      input.shootRequested = !game.gameOver;
 
-      const nextHud = updateGame(gameRef.current!, input, dt, now);
+      const nextHud = updateGame(game, input, dt, now);
+      setHud(nextHud);
+
       const canvas = canvasRef.current;
       if (canvas) {
         const ctx = canvas.getContext('2d');
         if (ctx) {
-          drawGame(ctx, gameRef.current!, now, window.devicePixelRatio || 1, flameVisible);
+          drawGame(ctx, game, now, window.devicePixelRatio || 1, movementRef.current.active || input.keyboard.up);
         }
       }
 
@@ -222,7 +416,7 @@ export function useGameLoop(paused: boolean, started: boolean, seed: string) {
         if (miniCtx) {
           drawMiniMap(
             miniCtx,
-            gameRef.current!,
+            game,
             window.devicePixelRatio || 1,
             miniMapCanvas.clientWidth,
             miniMapCanvas.clientHeight,
@@ -230,12 +424,18 @@ export function useGameLoop(paused: boolean, started: boolean, seed: string) {
         }
       }
 
-      setHud(nextHud);
-      if (!nextHud.gameOver) {
-        rafRef.current = window.requestAnimationFrame(tick);
-      } else {
-        rafRef.current = null;
+      if (game.saveRequested) {
+        persistCurrentRun();
       }
+
+      if (nextHud.gameOver) {
+        persistCurrentRun();
+        setPhase('gameover');
+        lastFrameRef.current = null;
+        return;
+      }
+
+      rafRef.current = window.requestAnimationFrame(tick);
     };
 
     rafRef.current = window.requestAnimationFrame(tick);
@@ -244,14 +444,36 @@ export function useGameLoop(paused: boolean, started: boolean, seed: string) {
         window.cancelAnimationFrame(rafRef.current);
       }
     };
-  }, [drawCurrentFrame, initializeGame, paused, started, hud.gameOver]);
+  }, [phase, persistCurrentRun]);
+
+  useEffect(() => {
+    if (phase === 'playing' && gameRef.current) {
+      drawCurrentFrame();
+    }
+  }, [drawCurrentFrame, phase]);
 
   return {
     canvasRef,
     miniMapRef,
     hud,
     mapState,
-    restartGame,
-    setMovement,
+    phase,
+    mapOpen,
+    saveBundle,
+    activeSlot,
+    startNewGame,
+    continueGame,
+    loadGame,
+    pauseGame,
+    resumeGame,
+    openMenu,
+    openMap,
+    closeMap,
+    toggleMap,
+    setMovement: (movement: JoystickVector) => {
+      movementRef.current = movement;
+    },
+    restartCurrentGame,
+    setPhase,
   };
 }

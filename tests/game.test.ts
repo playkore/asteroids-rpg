@@ -1,77 +1,250 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createGameState, createInputState, updateGame } from '../src/game';
+import {
+  cellKey,
+  createGameState,
+  createInputState,
+  generateCellRecord,
+  hydrateGameState,
+  prepareGameStateForSave,
+  updateGame,
+} from '../src/game';
+import type { SaveSlotData } from '../src/save';
 
 afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe('updateGame', () => {
-  it('damages and destroys an asteroid, then awards xp', () => {
-    const state = createGameState(800, 600);
+describe('game logic', () => {
+  it('generates cells deterministically from the seed and coordinates', () => {
+    const first = generateCellRecord('CINDER-5D', { x: 2, y: 3 });
+    const second = generateCellRecord('CINDER-5D', { x: 2, y: 3 });
+
+    expect(first).toEqual(second);
+  });
+
+  it('moves the player into a neighboring cell when crossing an edge', () => {
+    const state = createGameState(320, 240, 'CINDER-5D');
+    state.cells[cellKey(state.currentCell)] = {
+      kind: 'empty',
+      visited: true,
+      cleared: false,
+      remaining: { 3: 0, 2: 0, 1: 0 },
+    };
+    state.asteroids = [];
+    state.ship.x = -1;
+    state.ship.y = 120;
+    state.ship.vx = 0;
+    state.ship.vy = 0;
+    state.transitionCooldownUntil = 0;
+    state.ship.invulnerableUntil = 0;
+
+    updateGame(state, createInputState(), 0, 1000);
+
+    expect(state.currentCell).toEqual({ x: -1, y: 0 });
+    expect(state.ship.x).toBeCloseTo(319);
+    expect(state.cells[cellKey({ x: -1, y: 0 })]).toBeTruthy();
+    expect(state.saveRequested).toBe(true);
+  });
+
+  it('wraps asteroids around the screen', () => {
+    const state = createGameState(320, 240, 'CINDER-5D');
     state.ship.alive = false;
-    state.player.attack = 18;
     state.asteroids = [
       {
-        x: 120,
-        y: 160,
+        x: -5,
+        y: 120,
         vx: 0,
         vy: 0,
         size: 3,
         radius: 56,
-        hp: 18,
-        maxHp: 18,
-        xpReward: 60,
-        contactDamage: 10,
+        hp: 12,
+        maxHp: 12,
+        xpReward: 4,
+        contactDamage: 3,
+        hpVisible: false,
+      },
+    ];
+
+    updateGame(state, createInputState(), 1, 1000);
+
+    expect(state.asteroids[0]?.x).toBe(315);
+  });
+
+  it('splits large asteroids into three medium asteroids', () => {
+    const state = createGameState(320, 240, 'CINDER-5D');
+    state.ship.alive = false;
+    state.player.xp = 0;
+    state.cells[cellKey(state.currentCell)] = {
+      kind: 'combat',
+      visited: true,
+      cleared: false,
+      remaining: { 3: 1, 2: 0, 1: 0 },
+    };
+    state.asteroids = [
+      {
+        x: 120,
+        y: 120,
+        vx: 0,
+        vy: 0,
+        size: 3,
+        radius: 56,
+        hp: 1,
+        maxHp: 1,
+        xpReward: 4,
+        contactDamage: 3,
+        hpVisible: false,
       },
     ];
     state.bullets = [
       {
         x: 120,
-        y: 160,
+        y: 120,
         vx: 0,
         vy: 0,
         life: 1,
-        damage: 18,
+        damage: 10,
+      },
+    ];
+
+    updateGame(state, createInputState(), 0, 1000);
+
+    expect(state.player.xp).toBe(4);
+    expect(state.asteroids).toHaveLength(3);
+    expect(state.asteroids.every((asteroid) => asteroid.size === 2)).toBe(true);
+  });
+
+  it('clears a cell, grants the clear reward, and levels up through xp', () => {
+    const state = createGameState(320, 240, 'CINDER-5D');
+    state.ship.alive = false;
+    state.player.xp = 4;
+    state.player.hp = 6;
+    state.cells[cellKey(state.currentCell)] = {
+      kind: 'combat',
+      visited: true,
+      cleared: false,
+      remaining: { 3: 0, 2: 0, 1: 1 },
+    };
+    state.asteroids = [
+      {
+        x: 120,
+        y: 120,
+        vx: 0,
+        vy: 0,
+        size: 1,
+        radius: 20,
+        hp: 1,
+        maxHp: 1,
+        xpReward: 1,
+        contactDamage: 1,
+        hpVisible: false,
+      },
+    ];
+    state.bullets = [
+      {
+        x: 120,
+        y: 120,
+        vx: 0,
+        vy: 0,
+        life: 1,
+        damage: 1,
       },
     ];
 
     updateGame(state, createInputState(), 0, 1000);
 
     expect(state.player.level).toBe(2);
-    expect(state.player.xp).toBe(12);
-    expect(state.player.hp).toBe(74);
-    expect(state.bullets).toHaveLength(0);
+    expect(state.player.xp).toBe(3);
+    expect(state.player.maxHp).toBe(12);
+    expect(state.player.hp).toBe(12);
+    expect(state.cells[cellKey(state.currentCell)]?.cleared).toBe(true);
     expect(state.asteroids).toHaveLength(0);
   });
 
-  it('reduces player hp on asteroid contact', () => {
-    const state = createGameState(800, 600);
-    state.ship.x = 240;
-    state.ship.y = 180;
+  it('reduces player hp and ends the run on lethal contact', () => {
+    const state = createGameState(320, 240, 'CINDER-5D');
+    state.ship.x = 120;
+    state.ship.y = 120;
     state.ship.vx = 0;
     state.ship.vy = 0;
     state.ship.alive = true;
     state.ship.invulnerableUntil = 0;
-    state.player.hp = 60;
+    state.player.hp = 1;
     state.asteroids = [
       {
-        x: 240,
-        y: 180,
+        x: 120,
+        y: 120,
         vx: 0,
         vy: 0,
         size: 3,
         radius: 56,
-        hp: 24,
-        maxHp: 24,
-        xpReward: 12,
-        contactDamage: 10,
+        hp: 12,
+        maxHp: 12,
+        xpReward: 4,
+        contactDamage: 1,
+        hpVisible: false,
       },
     ];
 
     updateGame(state, createInputState(), 0, 1000);
 
-    expect(state.player.hp).toBe(50);
-    expect(state.ship.alive).toBe(true);
-    expect(state.gameOver).toBe(false);
+    expect(state.player.hp).toBe(0);
+    expect(state.ship.alive).toBe(false);
+    expect(state.gameOver).toBe(true);
+  });
+
+  it('hydrates a partially cleared cell from saved counts', () => {
+    const snapshot: SaveSlotData = {
+      version: 1,
+      seed: 'CINDER-5D',
+      width: 320,
+      height: 240,
+      currentCell: { x: 1, y: 2 },
+      ship: {
+        x: 160,
+        y: 120,
+        vx: 0,
+        vy: 0,
+        angle: 0,
+        invulnerableUntil: 0,
+        alive: true,
+      },
+      player: {
+        level: 2,
+        xp: 3,
+        hp: 12,
+        maxHp: 12,
+        attack: 3,
+      },
+      nextShotAt: 0,
+      transitionCooldownUntil: 0,
+      regenAccumulator: 0,
+      spawnCounter: 0,
+      gameOver: false,
+      cells: {
+        '1:2': {
+          kind: 'combat',
+          visited: true,
+          cleared: false,
+          remaining: {
+            3: 0,
+            2: 2,
+            1: 1,
+          },
+        },
+      },
+      savedAt: 0,
+    };
+
+    const hydrated = hydrateGameState(snapshot);
+
+    expect(hydrated.currentCell).toEqual({ x: 1, y: 2 });
+    expect(hydrated.asteroids).toHaveLength(3);
+    expect(hydrated.asteroids.map((asteroid) => asteroid.size).sort()).toEqual([1, 2, 2]);
+    prepareGameStateForSave(hydrated);
+    expect(hydrated.cells['1:2']?.remaining).toEqual({
+      3: 0,
+      2: 2,
+      1: 1,
+    });
   });
 });

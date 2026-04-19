@@ -5,12 +5,14 @@ import { UI_LINE_COLOR, UI_LINE_WIDTH } from '../src/constants';
 
 function createMockContext() {
   const arc = vi.fn();
+  const fillRect = vi.fn();
+  const strokeRect = vi.fn();
   const lineWidths: number[] = [];
   let currentLineWidth = 0;
   const context = {
     setTransform: vi.fn(),
     clearRect: vi.fn(),
-    fillRect: vi.fn(),
+    fillRect,
     beginPath: vi.fn(),
     arc,
     fill: vi.fn(),
@@ -24,7 +26,7 @@ function createMockContext() {
     lineTo: vi.fn(),
     closePath: vi.fn(),
     stroke: vi.fn(),
-    strokeRect: vi.fn(),
+    strokeRect,
     fillStyle: '#000',
     strokeStyle: '#000',
     lineJoin: 'miter',
@@ -49,7 +51,6 @@ describe('drawGame', () => {
     const state = createGameState(320, 240);
     state.asteroids = [];
     state.bullets = [];
-    state.portals = [];
 
     drawGame(ctx, state, 0, 1, false);
 
@@ -64,139 +65,43 @@ describe('drawGame', () => {
     expect(first).toBe(second);
   });
 
-  it('does not draw stars', () => {
+  it('draws a fixed arena grid and the ship', () => {
     const ctx = createMockContext();
     const state = createGameState(320, 240);
     state.asteroids = [];
     state.bullets = [];
-    state.portals = [];
+    state.ship.alive = true;
 
     drawGame(ctx, state, 0, 1, false);
 
-    expect(ctx.fillRect).toHaveBeenCalledTimes(1);
-  });
-
-  it('draws a thin background grid', () => {
-    const ctx = createMockContext();
-    const state = createGameState(320, 240);
-    state.ship.alive = false;
-    state.asteroids = [
-      {
-        x: 20,
-        y: 10,
-        vx: 0,
-        vy: 0,
-        size: 3,
-        radius: 56,
-        hp: 24,
-        maxHp: 24,
-        xpReward: 12,
-        contactDamage: 14,
-      },
-    ];
-    state.bullets = [];
-    state.portals = [];
-
-    drawGame(ctx, state, 0, 1, false);
-
-    expect(ctx.clip).toHaveBeenCalledTimes(1);
-    expect(ctx.stroke).toHaveBeenCalledTimes(3);
-    expect(ctx.fill).toHaveBeenCalledTimes(1);
+    expect(ctx.stroke).toHaveBeenCalled();
     expect((ctx as any).lineWidths).toContain(1);
   });
 
-  it('centers the minimap on the ship', () => {
+  it('draws the mini-map with visited cells and a current cell marker', () => {
     const ctx = createMockContext();
     const state = createGameState(320, 240);
+    state.cells = {
+      '0:0': {
+        kind: 'combat',
+        visited: true,
+        cleared: false,
+        remaining: { 3: 1, 2: 0, 1: 0 },
+      },
+      '1:0': {
+        kind: 'empty',
+        visited: true,
+        cleared: true,
+        remaining: { 3: 0, 2: 0, 1: 0 },
+      },
+    };
+    state.currentCell = { x: 0, y: 0 };
     state.asteroids = [];
-    state.bullets = [];
 
     drawMiniMap(ctx, state, 1, 160, 160);
 
-    expect(ctx.strokeRect).toHaveBeenCalledTimes(1);
-    expect((ctx as any).arc.mock.calls.at(-1)).toEqual([80, 80, 2.5, 0, Math.PI * 2]);
-    expect(ctx.fill).toHaveBeenCalled();
-  });
-
-  it('moves world objects relative to the ship on the minimap', () => {
-    const state = createGameState(320, 240);
-    state.asteroids = [
-      {
-        x: 100,
-        y: 0,
-        vx: 0,
-        vy: 0,
-        size: 3,
-        radius: 56,
-        hp: 24,
-        maxHp: 24,
-        xpReward: 12,
-        contactDamage: 14,
-      },
-    ];
-
-    const firstCtx = createMockContext();
-    drawMiniMap(firstCtx, state, 1, 160, 160);
-    const firstX = (firstCtx as any).arc.mock.calls[0][0] as number;
-
-    const secondCtx = createMockContext();
-    state.ship.x = 50;
-    drawMiniMap(secondCtx, state, 1, 160, 160);
-    const secondX = (secondCtx as any).arc.mock.calls[0][0] as number;
-
-    expect(secondX).toBeLessThan(firstX);
-    expect(firstX).toBeGreaterThan(80);
-    expect(secondX).toBeGreaterThan(80);
-  });
-
-  it('does not draw bullets on the minimap', () => {
-    const ctx = createMockContext();
-    const state = createGameState(320, 240);
-    state.asteroids = [];
-    state.bullets = [
-      {
-        x: 120,
-        y: 0,
-        vx: 0,
-        vy: 0,
-        life: 1,
-        damage: 9,
-      },
-    ];
-
-    drawMiniMap(ctx, state, 1, 160, 160);
-
-    expect((ctx as any).arc.mock.calls).toHaveLength(1);
-  });
-
-  it('draws portal circles on the main screen', () => {
-    const ctx = createMockContext();
-    const state = createGameState(320, 240);
-    state.cave = [
-      { x: -20, y: -20 },
-      { x: 20, y: -20 },
-      { x: 20, y: 20 },
-      { x: -20, y: 20 },
-    ];
-    state.portals = [
-      {
-        x: 10,
-        y: 0,
-        key: 'portal-1',
-        spawnAnchor: { x: 0, y: 0 },
-        connection: {
-          key: 'main:0:0',
-          kind: 'main',
-          targetSeed: 'ALPHA-7X',
-          targetDepth: 1,
-        },
-      },
-    ];
-    state.asteroids = [];
-    state.bullets = [];
-
-    drawGame(ctx, state, 0, 1, false);
-
-    expect((ctx as any).arc.mock.calls).toHaveLength(1);
+    expect(ctx.strokeRect).toHaveBeenCalled();
+    expect(ctx.arc).toHaveBeenCalled();
+    expect(ctx.fillRect).toHaveBeenCalled();
   });
 });
