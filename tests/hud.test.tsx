@@ -64,4 +64,61 @@ describe('Hud', () => {
     expect(markup).not.toContain('0 / 0');
     expect(markup).toContain('hud__sector-clear');
   });
+
+  it('shows sector void for negative y coordinates', () => {
+    const markup = renderToStaticMarkup(
+      <Hud
+        hud={{
+          player: {
+            level: 2,
+            xp: 3,
+            hp: 8,
+            maxHp: 12,
+            attack: 3,
+          },
+          seed: 'CINDER-5D',
+          gameOver: false,
+          ready: true,
+          cell: { x: 4, y: -1 },
+          cellLevel: 0,
+          sectorAsteroidHpCurrent: 0,
+          sectorAsteroidHpTotal: 0,
+          sectorHasAsteroids: false,
+          slotIndex: 0,
+        }}
+      />,
+    );
+
+    expect(markup).toContain('SECTOR VOID');
+    expect(markup).not.toContain('SECTOR ECHO');
+  });
+
+  it('renders menu button inside the hud container when provided', () => {
+    const markup = renderToStaticMarkup(
+      <Hud
+        hud={{
+          player: {
+            level: 2,
+            xp: 3,
+            hp: 8,
+            maxHp: 12,
+            attack: 3,
+          },
+          seed: 'CINDER-5D',
+          gameOver: false,
+          ready: true,
+          cell: { x: 4, y: 253 },
+          cellLevel: 3,
+          sectorAsteroidHpCurrent: 0,
+          sectorAsteroidHpTotal: 0,
+          sectorHasAsteroids: false,
+          slotIndex: 0,
+        }}
+        onMenuClick={() => undefined}
+      />,
+    );
+
+    expect(markup).toContain('<button class="hud__menu-button" type="button">Menu</button>');
+    expect(markup).toContain('hud__menu-button');
+  });
 });

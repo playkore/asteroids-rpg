@@ -71,13 +71,13 @@ button {
   position: absolute;
   top: max(env(safe-area-inset-top), 14px);
   left: 12px;
-  right: 76px;
+  right: 12px;
   display: flex;
   gap: 10px;
   justify-content: space-between;
   align-items: stretch;
   pointer-events: none;
-  z-index: 2;
+  z-index: 4;
 }
 
 .hud__pill {
@@ -111,6 +111,18 @@ button {
   pointer-events: auto;
   display: grid;
   gap: 4px;
+}
+
+.hud__menu-button {
+  flex: 0 0 auto;
+  align-self: stretch;
+  border: var(--ui-line-width) solid var(--ui-line-color);
+  border-radius: 999px;
+  background: #090d13;
+  color: var(--text);
+  padding: 10px 16px;
+  letter-spacing: 0.12em;
+  pointer-events: auto;
 }
 
 .hud__sector-clear {
@@ -161,7 +173,7 @@ button {
 .overlay__button:focus-visible,
 .start-screen__input:focus-visible,
 .map-toggle:focus-visible,
-.menu-button:focus-visible,
+.hud__menu-button:focus-visible,
 .map-overlay__close:focus-visible {
   outline: 2px solid var(--ui-line-color);
   outline-offset: 2px;
@@ -170,7 +182,7 @@ button {
 .controls-layer {
   position: absolute;
   inset: 0;
-  z-index: 2;
+  z-index: 3;
   pointer-events: none;
 }
 
@@ -380,27 +392,10 @@ button {
   cursor: not-allowed;
 }
 
-.menu-button {
-  position: absolute;
-  right: 14px;
-  border: var(--ui-line-width) solid var(--ui-line-color);
-  border-radius: 999px;
-  background: #090d13;
-  color: var(--text);
-  padding: 10px 16px;
-  letter-spacing: 0.12em;
-  z-index: 4;
-  pointer-events: auto;
-}
-
 @media (min-width: 768px) {
   .hud {
     left: 18px;
-    right: 90px;
+    right: 18px;
     gap: 12px;
-  }
-
-  .menu-button {
-    right: 24px;
   }
 }

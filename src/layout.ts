@@ -1,4 +1,3 @@
-export const MENU_BUTTON_TOP = 'calc(max(env(safe-area-inset-top), 14px) + 132px)';
 export const GAME_FIELD_TOP = 150;
 export const GAME_FIELD_LEFT = 12;
 
