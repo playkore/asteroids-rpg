@@ -564,6 +564,70 @@ describe('game logic', () => {
     expect(state.gameOver).toBe(true);
   });
 
+  it('bounces the ship and a small asteroid off each other while still dealing contact damage', () => {
+    const state = createGameState(320, 240, 'CINDER-5D');
+    state.ship.x = 100;
+    state.ship.y = 120;
+    state.ship.vx = 10;
+    state.ship.vy = 0;
+    state.ship.alive = true;
+    state.ship.invulnerableUntil = 0;
+    state.player.hp = 5;
+    state.asteroids = [
+      {
+        x: 120,
+        y: 120,
+        vx: 0,
+        vy: 0,
+        size: 1,
+        radius: 20,
+        hp: 12,
+        maxHp: 12,
+        xpReward: 1,
+        contactDamage: 1,
+        hpVisible: false,
+      },
+    ];
+
+    updateGame(state, createInputState(), 0, 1000);
+
+    expect(state.player.hp).toBe(4);
+    expect(state.ship.vx).toBeCloseTo(0);
+    expect(state.asteroids[0]?.vx).toBeCloseTo(9.92);
+  });
+
+  it('uses the asteroid mass when bouncing against a medium asteroid', () => {
+    const state = createGameState(320, 240, 'CINDER-5D');
+    state.ship.x = 100;
+    state.ship.y = 120;
+    state.ship.vx = 10;
+    state.ship.vy = 0;
+    state.ship.alive = true;
+    state.ship.invulnerableUntil = 0;
+    state.player.hp = 5;
+    state.asteroids = [
+      {
+        x: 120,
+        y: 120,
+        vx: 0,
+        vy: 0,
+        size: 2,
+        radius: 34,
+        hp: 12,
+        maxHp: 12,
+        xpReward: 2,
+        contactDamage: 2,
+        hpVisible: false,
+      },
+    ];
+
+    updateGame(state, createInputState(), 0, 1000);
+
+    expect(state.player.hp).toBe(3);
+    expect(state.ship.vx).toBeCloseTo(-4.96);
+    expect(state.asteroids[0]?.vx).toBeCloseTo(4.96);
+  });
+
   it('hydrates a combat cell but resets it to the original large asteroids when saving progress', () => {
     const snapshot: SaveSlotData = {
       version: 1,

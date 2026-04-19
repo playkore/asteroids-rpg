@@ -175,6 +175,13 @@ const ASTEROID_XP_REWARD: Record<AsteroidSize, number> = {
   1: 1,
 };
 
+const SHIP_MASS = 1;
+const ASTEROID_MASS: Record<AsteroidSize, number> = {
+  3: 9,
+  2: 3,
+  1: 1,
+};
+
 export function createInputState(): InputState {
   return {
     moveX: 0,
@@ -593,8 +600,15 @@ function resolveBulletHits(state: GameState) {
 function resolveShipAsteroidContacts(state: GameState, now: number) {
   for (const asteroid of state.asteroids) {
     if (distanceSquared(state.ship.x, state.ship.y, asteroid.x, asteroid.y) < (SHIP_RADIUS + asteroid.radius) ** 2) {
+      resolveCircleCollision(
+        state.ship,
+        SHIP_RADIUS,
+        SHIP_MASS,
+        asteroid,
+        asteroid.radius,
+        ASTEROID_MASS[asteroid.size],
+      );
       damagePlayer(state, asteroid.contactDamage, now);
-      return;
     }
   }
 }
@@ -935,6 +949,63 @@ function distanceSquared(ax: number, ay: number, bx: number, by: number) {
   const dx = ax - bx;
   const dy = ay - by;
   return dx * dx + dy * dy;
+}
+
+function resolveCircleCollision(
+  ship: { x: number; y: number; vx: number; vy: number },
+  shipRadius: number,
+  shipMass: number,
+  asteroid: { x: number; y: number; vx: number; vy: number },
+  asteroidRadius: number,
+  asteroidMass: number,
+) {
+  const dx = asteroid.x - ship.x;
+  const dy = asteroid.y - ship.y;
+  const minDistance = shipRadius + asteroidRadius;
+  const distance = Math.hypot(dx, dy);
+
+  let normalX = 1;
+  let normalY = 0;
+  if (distance > 0) {
+    normalX = dx / distance;
+    normalY = dy / distance;
+  } else {
+    const relVx = ship.vx - asteroid.vx;
+    const relVy = ship.vy - asteroid.vy;
+    const relSpeed = Math.hypot(relVx, relVy);
+    if (relSpeed > 0) {
+      normalX = relVx / relSpeed;
+      normalY = relVy / relSpeed;
+    }
+  }
+
+  const penetration = minDistance - distance;
+  const inverseShipMass = 1 / shipMass;
+  const inverseAsteroidMass = 1 / asteroidMass;
+  const inverseMassSum = inverseShipMass + inverseAsteroidMass;
+  const correction = penetration / inverseMassSum;
+
+  ship.x -= normalX * correction * inverseShipMass;
+  ship.y -= normalY * correction * inverseShipMass;
+  asteroid.x += normalX * correction * inverseAsteroidMass;
+  asteroid.y += normalY * correction * inverseAsteroidMass;
+
+  const relativeVx = asteroid.vx - ship.vx;
+  const relativeVy = asteroid.vy - ship.vy;
+  const velocityAlongNormal = relativeVx * normalX + relativeVy * normalY;
+
+  if (velocityAlongNormal >= 0) {
+    return;
+  }
+
+  const impulse = (-2 * velocityAlongNormal) / inverseMassSum;
+  const impulseX = impulse * normalX;
+  const impulseY = impulse * normalY;
+
+  ship.vx -= impulseX * inverseShipMass;
+  ship.vy -= impulseY * inverseShipMass;
+  asteroid.vx += impulseX * inverseAsteroidMass;
+  asteroid.vy += impulseY * inverseAsteroidMass;
 }
 
 function clamp(value: number, min: number, max: number) {
