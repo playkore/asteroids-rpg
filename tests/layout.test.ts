@@ -3,6 +3,7 @@ import {
   GAME_FIELD_LEFT,
   GAME_FIELD_TOP,
   getGameCanvasLayout,
+  getViewportSize,
   getViewportGameCanvasLayout,
 } from '../src/layout';
 
@@ -29,6 +30,19 @@ describe('layout', () => {
       top: GAME_FIELD_TOP,
       left: GAME_FIELD_LEFT,
       size: 366,
+    });
+  });
+
+  it('falls back to inner dimensions when visual viewport is unavailable', () => {
+    expect(
+      getViewportSize({
+        innerWidth: 430.8,
+        innerHeight: 932.4,
+        visualViewport: null,
+      }),
+    ).toEqual({
+      width: 430,
+      height: 932,
     });
   });
 });

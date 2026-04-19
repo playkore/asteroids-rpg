@@ -27,7 +27,7 @@ import {
   writeSaveBundle,
 } from '../save';
 import { drawGame, drawMiniMap } from '../renderer';
-import { getViewportGameCanvasLayout } from '../layout';
+import { getViewportGameCanvasLayout, getViewportSize } from '../layout';
 import type { JoystickVector } from './useJoystickInput';
 
 const INITIAL_HUD: HudState = {
@@ -90,6 +90,10 @@ export function useGameLoop() {
     if (!canvas) {
       return;
     }
+
+    const { width: viewportWidth, height: viewportHeight } = getViewportSize(window);
+    document.documentElement.style.setProperty('--app-viewport-width', `${viewportWidth}px`);
+    document.documentElement.style.setProperty('--app-viewport-height', `${viewportHeight}px`);
 
     const dpr = window.devicePixelRatio || 1;
     const layout = getViewportGameCanvasLayout(window);
