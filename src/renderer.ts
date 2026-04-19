@@ -28,7 +28,7 @@ export function drawGame(
   drawArenaFrame(ctx, width, height);
   drawAsteroids(ctx, state.asteroids);
   drawBullets(ctx, state.bullets);
-  drawShip(ctx, state.ship, flameVisible);
+  drawShip(ctx, state.ship);
 }
 
 export function drawMiniMap(
@@ -146,7 +146,7 @@ function drawBullets(ctx: CanvasRenderingContext2D, bullets: Bullet[]) {
   }
 }
 
-function drawShip(ctx: CanvasRenderingContext2D, ship: Ship, flameVisible: boolean) {
+function drawShip(ctx: CanvasRenderingContext2D, ship: Ship) {
   if (!ship.alive) {
     return;
   }
@@ -164,12 +164,6 @@ function drawShip(ctx: CanvasRenderingContext2D, ship: Ship, flameVisible: boole
   ctx.lineTo(-8, 0);
   ctx.lineTo(-12, 10);
   ctx.closePath();
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.moveTo(-8, 0);
-  if (flameVisible) {
-    ctx.lineTo(-17, 0);
-  }
   ctx.stroke();
   ctx.restore();
 }
