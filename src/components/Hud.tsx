@@ -1,4 +1,5 @@
 import type { HudState } from '../game';
+import { formatHudCellCoord } from '../coordLabels';
 import { xpToNextLevel } from '../rpg';
 
 function progressWidth(current: number, max: number) {
@@ -9,14 +10,8 @@ function progressWidth(current: number, max: number) {
 }
 
 export default function Hud({ hud }: { hud: HudState }) {
-  const copySeed = async () => {
-    if (!navigator.clipboard?.writeText) {
-      return;
-    }
-    await navigator.clipboard.writeText(hud.seed);
-  };
-
   const xpMax = xpToNextLevel(hud.player.level);
+  const hasSectorAsteroids = hud.sectorHasAsteroids && hud.sectorAsteroidHpTotal > 0;
 
   return (
     <div className="hud">
@@ -38,16 +33,21 @@ export default function Hud({ hud }: { hud: HudState }) {
           {hud.player.xp} / {xpMax}
         </strong>
       </div>
-      <div className="hud__pill hud__pill--seed">
-        <span>
-          Lv {hud.player.level} · ATK {hud.player.attack}
-        </span>
-        <strong>
-          Cell {hud.cell.x}, {hud.cell.y} · L{hud.cellLevel}
-        </strong>
-        <button className="hud__seed-button" type="button" onClick={() => void copySeed()}>
-          {hud.seed}
-        </button>
+      <div className="hud__pill hud__pill--sector">
+        <span className="hud__sector-title">SECTOR {formatHudCellCoord(hud.cell.x, hud.cell.y)}</span>
+        {hasSectorAsteroids ? (
+          <div className="hud__meter">
+            <div
+              className="hud__meter-fill"
+              style={{
+                width: `${Math.max(0, Math.min(100, (hud.sectorAsteroidHpCurrent / hud.sectorAsteroidHpTotal) * 100))}%`,
+              }}
+            />
+          </div>
+        ) : (
+          <strong className="hud__sector-clear">CLEAR</strong>
+        )}
+        <strong className="hud__sector-hp">{hasSectorAsteroids ? `${hud.sectorAsteroidHpCurrent} / ${hud.sectorAsteroidHpTotal}` : ''}</strong>
       </div>
     </div>
   );

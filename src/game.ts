@@ -90,6 +90,9 @@ export type HudState = {
   ready: boolean;
   cell: CellCoord;
   cellLevel: number;
+  sectorAsteroidHpCurrent: number;
+  sectorAsteroidHpTotal: number;
+  sectorHasAsteroids: boolean;
   slotIndex: SaveSlotIndex | null;
 };
 
@@ -352,6 +355,7 @@ export function buildMapState(state: GameState): MapState {
 }
 
 export function buildHudState(state: GameState, ready: boolean): HudState {
+  const sectorHp = summarizeSectorAsteroidHp(state.asteroids, getCellLevel(state.currentCell));
   return {
     player: state.player,
     seed: state.seed,
@@ -359,6 +363,9 @@ export function buildHudState(state: GameState, ready: boolean): HudState {
     ready,
     cell: { ...state.currentCell },
     cellLevel: getCellLevel(state.currentCell),
+    sectorAsteroidHpCurrent: sectorHp.currentHp,
+    sectorAsteroidHpTotal: sectorHp.totalHp,
+    sectorHasAsteroids: sectorHp.hasAsteroids,
     slotIndex: state.slotIndex,
   };
 }
@@ -419,6 +426,28 @@ export function countAsteroidsBySize(asteroids: Asteroid[]): RemainingAsteroids 
 
 export function totalAsteroids(remaining: RemainingAsteroids) {
   return remaining[3] + remaining[2] + remaining[1];
+}
+
+export type SectorAsteroidHpSummary = {
+  currentHp: number;
+  totalHp: number;
+  hasAsteroids: boolean;
+};
+
+export function summarizeSectorAsteroidHp(asteroids: Asteroid[], level: number): SectorAsteroidHpSummary {
+  let currentHp = 0;
+  let totalHp = 0;
+
+  for (const asteroid of asteroids) {
+    currentHp += asteroid.hp + descendantAsteroidHp(level, asteroid.size);
+    totalHp += asteroid.maxHp + descendantAsteroidHp(level, asteroid.size);
+  }
+
+  return {
+    currentHp,
+    totalHp,
+    hasAsteroids: asteroids.length > 0,
+  };
 }
 
 export function prepareGameStateForSave(state: GameState) {
@@ -827,6 +856,18 @@ function getAsteroidHp(level: number, size: AsteroidSize) {
     return Math.max(1, Math.floor(largeHp / 2));
   }
   return Math.max(1, Math.floor(largeHp / 4));
+}
+
+function descendantAsteroidHp(level: number, size: AsteroidSize): number {
+  if (size === 1) {
+    return 0;
+  }
+
+  if (size === 2) {
+    return 3 * getAsteroidHp(level, 1);
+  }
+
+  return 3 * (getAsteroidHp(level, 2) + descendantAsteroidHp(level, 2));
 }
 
 function getAsteroidContactDamage(level: number, size: AsteroidSize) {

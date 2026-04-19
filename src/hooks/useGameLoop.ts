@@ -36,6 +36,9 @@ const INITIAL_HUD: HudState = {
   ready: false,
   cell: { x: 0, y: 0 },
   cellLevel: 1,
+  sectorAsteroidHpCurrent: 0,
+  sectorAsteroidHpTotal: 0,
+  sectorHasAsteroids: false,
   slotIndex: null,
 };
 

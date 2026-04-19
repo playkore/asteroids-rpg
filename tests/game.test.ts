@@ -7,6 +7,7 @@ import {
   hydrateGameState,
   prepareGameStateForSave,
   shouldAutoShoot,
+  summarizeSectorAsteroidHp,
   updateGame,
 } from '../src/game';
 import type { SaveSlotData } from '../src/save';
@@ -35,6 +36,46 @@ describe('game logic', () => {
 
     expect(cell.kind).toBe('combat');
     expect(cell.remaining).toEqual({ 3: 3, 2: 0, 1: 0 });
+  });
+
+  it('summarizes current and future asteroid hp for the sector', () => {
+    const summary = summarizeSectorAsteroidHp(
+      [
+        {
+          x: 10,
+          y: 10,
+          vx: 0,
+          vy: 0,
+          size: 3,
+          radius: 56,
+          hp: 7,
+          maxHp: 12,
+          xpReward: 4,
+          contactDamage: 3,
+          hpVisible: false,
+        },
+        {
+          x: 20,
+          y: 20,
+          vx: 0,
+          vy: 0,
+          size: 2,
+          radius: 34,
+          hp: 4,
+          maxHp: 6,
+          xpReward: 2,
+          contactDamage: 2,
+          hpVisible: false,
+        },
+      ],
+      1,
+    );
+
+    expect(summary).toEqual({
+      currentHp: 65,
+      totalHp: 72,
+      hasAsteroids: true,
+    });
   });
 
   it('generates combat cells on 254 of the first 1000 levels for x=0', () => {
@@ -166,6 +207,30 @@ describe('game logic', () => {
     expect(state.currentCell).toEqual({ x: 0, y: 0 });
     expect(state.ship.x).toBe(1);
     expect(state.cells[cellKey({ x: 0, y: 0 })]).toBeTruthy();
+  });
+
+  it('wraps horizontally from the left edge back to x=6', () => {
+    const state = createGameState(320, 240, 'CINDER-5D');
+    state.currentCell = { x: 0, y: 0 };
+    state.cells[cellKey(state.currentCell)] = {
+      kind: 'empty',
+      visited: true,
+      cleared: false,
+      remaining: { 3: 0, 2: 0, 1: 0 },
+    };
+    state.asteroids = [];
+    state.ship.x = -1;
+    state.ship.y = 120;
+    state.ship.vx = 0;
+    state.ship.vy = 0;
+    state.transitionCooldownUntil = 0;
+    state.ship.invulnerableUntil = 0;
+
+    updateGame(state, createInputState(), 0, 1000);
+
+    expect(state.currentCell).toEqual({ x: 6, y: 0 });
+    expect(state.ship.x).toBe(319);
+    expect(state.cells[cellKey({ x: 6, y: 0 })]).toBeTruthy();
   });
 
   it('wraps asteroids around the screen', () => {

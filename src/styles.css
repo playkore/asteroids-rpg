@@ -104,6 +104,19 @@ button {
   gap: 4px;
 }
 
+.hud__pill--sector {
+  max-width: 260px;
+  color: var(--text);
+  text-align: left;
+  pointer-events: auto;
+  display: grid;
+  gap: 4px;
+}
+
+.hud__sector-clear {
+  color: var(--text);
+}
+
 .hud__pill span {
   display: block;
   font-size: 0.62rem;
