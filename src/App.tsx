@@ -1,12 +1,15 @@
 import { useEffect, useState } from 'react';
 import FloatingControls from './components/FloatingControls';
 import Hud from './components/Hud';
+import OverwriteDialog from './components/OverwriteDialog';
 import StartScreen from './components/StartScreen';
 import { useGameLoop } from './hooks/useGameLoop';
 import { generateSeed, normalizeSeed } from './seed';
+import type { SaveSlotIndex } from './save';
 
 export default function App() {
   const [seed, setSeed] = useState(() => generateSeed());
+  const [pendingOverwriteSlot, setPendingOverwriteSlot] = useState<SaveSlotIndex | null>(null);
   const {
     canvasRef,
     miniMapRef,
@@ -40,12 +43,22 @@ export default function App() {
 
   const handleNewGame = (slot: 0 | 1 | 2) => {
     if (saveBundle.slots[slot]) {
-      const confirmed = window.confirm('This slot already has progress. Starting a new game will overwrite it.');
-      if (!confirmed) {
-        return;
-      }
+      setPendingOverwriteSlot(slot);
+      return;
     }
     startNewGame(seed, slot);
+  };
+
+  const cancelOverwrite = () => {
+    setPendingOverwriteSlot(null);
+  };
+
+  const confirmOverwrite = () => {
+    if (pendingOverwriteSlot === null) {
+      return;
+    }
+    startNewGame(seed, pendingOverwriteSlot);
+    setPendingOverwriteSlot(null);
   };
 
   const handleContinue = () => {
@@ -102,6 +115,14 @@ export default function App() {
             </button>
           </div>
         </div>
+      ) : null}
+
+      {pendingOverwriteSlot !== null ? (
+        <OverwriteDialog
+          slotLabel={`Slot ${pendingOverwriteSlot + 1}`}
+          onCancel={cancelOverwrite}
+          onConfirm={confirmOverwrite}
+        />
       ) : null}
 
       <FloatingControls

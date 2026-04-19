@@ -348,6 +348,19 @@ button {
   font-weight: 400;
 }
 
+.overlay__message {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.overlay__actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
 .overlay__button {
   border: var(--ui-line-width) solid var(--ui-line-color);
   padding: 12px 20px;
