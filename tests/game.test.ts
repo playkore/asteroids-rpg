@@ -6,6 +6,7 @@ import {
   generateCellRecord,
   hydrateGameState,
   prepareGameStateForSave,
+  shouldAutoShoot,
   updateGame,
 } from '../src/game';
 import type { SaveSlotData } from '../src/save';
@@ -27,6 +28,31 @@ describe('game logic', () => {
 
     expect(cell.kind).toBe('empty');
     expect(cell.remaining).toEqual({ 3: 0, 2: 0, 1: 0 });
+  });
+
+  it('only auto shoots when there are asteroids in the field', () => {
+    const emptyState = createGameState(320, 240, 'CINDER-5D');
+    emptyState.asteroids = [];
+
+    const combatState = createGameState(320, 240, 'CINDER-5D');
+    combatState.asteroids = [
+      {
+        x: 120,
+        y: 120,
+        vx: 0,
+        vy: 0,
+        size: 3,
+        radius: 56,
+        hp: 12,
+        maxHp: 12,
+        xpReward: 4,
+        contactDamage: 3,
+        hpVisible: false,
+      },
+    ];
+
+    expect(shouldAutoShoot(emptyState)).toBe(false);
+    expect(shouldAutoShoot(combatState)).toBe(true);
   });
 
   it('moves the player into the cell above when crossing the top edge', () => {

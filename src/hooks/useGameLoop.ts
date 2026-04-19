@@ -7,6 +7,7 @@ import {
   prepareGameStateForSave,
   resizeGameState,
   restartGame as resetGameState,
+  shouldAutoShoot,
   updateGame,
   type GamePhase,
   type GameState,
@@ -358,7 +359,7 @@ export function useGameLoop() {
       const input = inputRef.current;
       input.moveX = movementRef.current.active ? movementRef.current.x : 0;
       input.moveY = movementRef.current.active ? movementRef.current.y : 0;
-      input.shootRequested = !game.gameOver;
+      input.shootRequested = shouldAutoShoot(game);
 
       const nextHud = updateGame(game, input, dt, now);
       setHud(nextHud);

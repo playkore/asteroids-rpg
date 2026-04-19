@@ -337,6 +337,10 @@ export function updateGame(
   return buildHudState(state, state.ship.alive && now >= state.ship.invulnerableUntil);
 }
 
+export function shouldAutoShoot(state: GameState) {
+  return !state.gameOver && state.asteroids.length > 0;
+}
+
 export function buildMapState(state: GameState): MapState {
   return {
     seed: state.seed,
