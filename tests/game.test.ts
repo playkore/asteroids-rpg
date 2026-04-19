@@ -3,6 +3,7 @@ import {
   cellKey,
   createGameState,
   createInputState,
+  buildHudState,
   generateCellRecord,
   hydrateGameState,
   prepareGameStateForSave,
@@ -115,6 +116,106 @@ describe('game logic', () => {
     expect(shouldAutoShoot(combatState)).toBe(true);
   });
 
+  it('keeps sector asteroid total hp fixed for the whole cell while current hp decreases', () => {
+    const state = createGameState(320, 240, 'CINDER-5D');
+    state.cells[cellKey(state.currentCell)] = {
+      kind: 'combat',
+      visited: true,
+      cleared: false,
+      remaining: { 3: 3, 2: 0, 1: 0 },
+    };
+    state.asteroids = [
+      {
+        x: 120,
+        y: 120,
+        vx: 0,
+        vy: 0,
+        size: 3,
+        radius: 56,
+        hp: 12,
+        maxHp: 12,
+        xpReward: 4,
+        contactDamage: 3,
+        hpVisible: false,
+      },
+      {
+        x: 120,
+        y: 120,
+        vx: 0,
+        vy: 0,
+        size: 3,
+        radius: 56,
+        hp: 12,
+        maxHp: 12,
+        xpReward: 4,
+        contactDamage: 3,
+        hpVisible: false,
+      },
+      {
+        x: 120,
+        y: 120,
+        vx: 0,
+        vy: 0,
+        size: 3,
+        radius: 56,
+        hp: 12,
+        maxHp: 12,
+        xpReward: 4,
+        contactDamage: 3,
+        hpVisible: false,
+      },
+    ];
+
+    const initialHud = buildHudState(state, true);
+
+    state.asteroids = [
+      {
+        x: 120,
+        y: 120,
+        vx: 0,
+        vy: 0,
+        size: 2,
+        radius: 34,
+        hp: 6,
+        maxHp: 6,
+        xpReward: 2,
+        contactDamage: 2,
+        hpVisible: false,
+      },
+      {
+        x: 120,
+        y: 120,
+        vx: 0,
+        vy: 0,
+        size: 2,
+        radius: 34,
+        hp: 6,
+        maxHp: 6,
+        xpReward: 2,
+        contactDamage: 2,
+        hpVisible: false,
+      },
+      {
+        x: 120,
+        y: 120,
+        vx: 0,
+        vy: 0,
+        size: 2,
+        radius: 34,
+        hp: 6,
+        maxHp: 6,
+        xpReward: 2,
+        contactDamage: 2,
+        hpVisible: false,
+      },
+    ];
+
+    const afterSplitHud = buildHudState(state, true);
+
+    expect(afterSplitHud.sectorAsteroidHpTotal).toBe(initialHud.sectorAsteroidHpTotal);
+    expect(afterSplitHud.sectorAsteroidHpCurrent).toBeLessThan(initialHud.sectorAsteroidHpCurrent);
+  });
+
   it('moves the player into the cell above when crossing the top edge', () => {
     const state = createGameState(320, 240, 'CINDER-5D');
     state.cells[cellKey(state.currentCell)] = {
@@ -137,6 +238,37 @@ describe('game logic', () => {
     expect(state.ship.y).toBeCloseTo(239);
     expect(state.cells[cellKey({ x: 0, y: 1 })]).toBeTruthy();
     expect(state.saveRequested).toBe(true);
+  });
+
+  it('spawns asteroids in the center of a new combat cell with varied directions', () => {
+    const state = createGameState(320, 240, 'CINDER-5D');
+    state.cells[cellKey(state.currentCell)] = {
+      kind: 'empty',
+      visited: true,
+      cleared: false,
+      remaining: { 3: 0, 2: 0, 1: 0 },
+    };
+    state.cells[cellKey({ x: 0, y: 1 })] = {
+      kind: 'combat',
+      visited: true,
+      cleared: false,
+      remaining: { 3: 3, 2: 0, 1: 0 },
+    };
+    state.asteroids = [];
+    state.ship.x = 160;
+    state.ship.y = -1;
+    state.ship.vx = 0;
+    state.ship.vy = 0;
+    state.transitionCooldownUntil = 0;
+    state.ship.invulnerableUntil = 0;
+
+    updateGame(state, createInputState(), 0, 1000);
+
+    expect(state.currentCell).toEqual({ x: 0, y: 1 });
+    expect(state.asteroids).toHaveLength(3);
+    expect(state.asteroids.every((asteroid) => asteroid.x === 160 && asteroid.y === 120)).toBe(true);
+    expect(state.asteroids.every((asteroid) => Math.hypot(asteroid.vx, asteroid.vy) > 0)).toBe(true);
+    expect(new Set(state.asteroids.map((asteroid) => Math.atan2(asteroid.vy, asteroid.vx).toFixed(3))).size).toBeGreaterThan(1);
   });
 
   it('allows the player to move into negative y cells and keeps them empty', () => {

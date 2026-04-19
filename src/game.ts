@@ -359,7 +359,12 @@ export function buildMapState(state: GameState): MapState {
 }
 
 export function buildHudState(state: GameState, ready: boolean): HudState {
-  const sectorHp = summarizeSectorAsteroidHp(state.asteroids, getCellLevel(state.currentCell));
+  const currentCell = state.cells[cellKey(state.currentCell)];
+  const sectorHp = summarizeSectorAsteroidHp(
+    state.asteroids,
+    getCellLevel(state.currentCell),
+    currentCell?.remaining,
+  );
   return {
     player: state.player,
     seed: state.seed,
@@ -438,20 +443,41 @@ export type SectorAsteroidHpSummary = {
   hasAsteroids: boolean;
 };
 
-export function summarizeSectorAsteroidHp(asteroids: Asteroid[], level: number): SectorAsteroidHpSummary {
+export function summarizeSectorAsteroidHp(
+  asteroids: Asteroid[],
+  level: number,
+  remaining?: RemainingAsteroids,
+): SectorAsteroidHpSummary {
   let currentHp = 0;
-  let totalHp = 0;
 
   for (const asteroid of asteroids) {
     currentHp += asteroid.hp + descendantAsteroidHp(level, asteroid.size);
-    totalHp += asteroid.maxHp + descendantAsteroidHp(level, asteroid.size);
   }
+
+  const totalHp = remaining
+    ? totalAsteroidTreeHp(level, remaining)
+    : asteroids.reduce(
+        (sum, asteroid) => sum + asteroid.maxHp + descendantAsteroidHp(level, asteroid.size),
+        0,
+      );
 
   return {
     currentHp,
     totalHp,
     hasAsteroids: asteroids.length > 0,
   };
+}
+
+function totalAsteroidTreeHp(level: number, remaining: RemainingAsteroids) {
+  return (
+    remaining[3] * getAsteroidTreeHp(level, 3) +
+    remaining[2] * getAsteroidTreeHp(level, 2) +
+    remaining[1] * getAsteroidTreeHp(level, 1)
+  );
+}
+
+function getAsteroidTreeHp(level: number, size: AsteroidSize) {
+  return getAsteroidHp(level, size) + descendantAsteroidHp(level, size);
 }
 
 export function prepareGameStateForSave(state: GameState) {
@@ -674,7 +700,6 @@ function handleClearCell(state: GameState) {
 }
 
 function saveCurrentCellProgress(state: GameState) {
-  const key = cellKey(state.currentCell);
   const cell = ensureCellExists(state, state.currentCell);
 
   if (cell.kind === 'empty') {
@@ -683,8 +708,22 @@ function saveCurrentCellProgress(state: GameState) {
   }
 
   cell.visited = true;
-  cell.remaining = countAsteroidsBySize(state.asteroids);
-  cell.cleared = totalAsteroids(cell.remaining) === 0;
+  if (state.asteroids.length === 0) {
+    cell.remaining = {
+      3: 0,
+      2: 0,
+      1: 0,
+    };
+    cell.cleared = true;
+    return;
+  }
+
+  cell.remaining = {
+    3: 3,
+    2: 0,
+    1: 0,
+  };
+  cell.cleared = false;
 }
 
 function enterCell(state: GameState, cell: CellCoord, now: number, initial: boolean) {
@@ -766,7 +805,6 @@ function spawnAsteroidsForCell(context: CellSpawnContext, remaining: RemainingAs
         context.level,
         size,
         random,
-        context.spawnCounter + index,
         context.width,
         context.height,
       );
@@ -784,20 +822,18 @@ function createAsteroid(
   level: number,
   size: AsteroidSize,
   random: () => number,
-  salt: number,
   width: number,
   height: number,
 ): Asteroid {
   const angle = random() * Math.PI * 2;
-  const distance = 80 + random() * 220;
   const sizeBias = size === 3 ? 1 : size === 2 ? 1.15 : 1.3;
   const levelBias = 1 + Math.min(level, 12) * 0.04;
   const speed = ASTEROID_SPEED[size] * sizeBias * levelBias;
   const hp = getAsteroidHp(level, size);
 
   return {
-    x: clamp(Math.cos(angle) * distance + width / 2 + (salt % 3 - 1) * 24, 20, width - 20),
-    y: clamp(Math.sin(angle) * distance + height / 2 + ((salt + 1) % 3 - 1) * 24, 20, height - 20),
+    x: width / 2,
+    y: height / 2,
     vx: Math.cos(angle + Math.PI / 2) * speed,
     vy: Math.sin(angle + Math.PI / 2) * speed,
     size,
