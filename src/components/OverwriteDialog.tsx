@@ -6,7 +6,7 @@ type OverwriteDialogProps = {
 
 export default function OverwriteDialog({ slotLabel, onCancel, onConfirm }: OverwriteDialogProps) {
   return (
-    <div className="overlay">
+    <div className="overlay overlay--floating">
       <div className="overlay__panel">
         <h1>Overwrite?</h1>
         <p className="overlay__message">{slotLabel} already has progress.</p>

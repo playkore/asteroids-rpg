@@ -25,6 +25,7 @@ describe('StartScreen', () => {
     expect(markup).toContain('Seed');
     expect(markup).toContain('Continue');
     expect(markup).toContain('New Game');
+    expect(markup).not.toContain('Resume');
     expect(markup).toContain('Load Game');
     expect(markup).toContain('Slot 1');
     expect(markup).toContain('ALPHA-7X');

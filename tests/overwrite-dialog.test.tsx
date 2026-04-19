@@ -12,5 +12,6 @@ describe('OverwriteDialog', () => {
     expect(markup).toContain('Slot 2 already has progress.');
     expect(markup).toContain('Cancel');
     expect(markup).toContain('Start New');
+    expect(markup).toContain('overlay--floating');
   });
 });

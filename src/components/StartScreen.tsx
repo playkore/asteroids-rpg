@@ -7,7 +7,6 @@ type StartScreenProps = {
   onContinue: () => void;
   onNewGame: (slot: SaveSlotIndex) => void;
   onLoadGame: (slot: SaveSlotIndex) => void;
-  onResume?: () => void;
   paused: boolean;
   saveBundle: SaveBundle;
 };
@@ -28,7 +27,6 @@ export default function StartScreen({
   onContinue,
   onNewGame,
   onLoadGame,
-  onResume,
   paused,
   saveBundle,
 }: StartScreenProps) {
@@ -64,11 +62,6 @@ export default function StartScreen({
           >
             Continue
           </button>
-          {onResume ? (
-            <button className="overlay__button start-screen__primary" type="button" onClick={onResume}>
-              Resume
-            </button>
-          ) : null}
         </div>
 
         <div className="start-screen__slots">

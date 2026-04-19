@@ -330,6 +330,10 @@ button {
   pointer-events: auto;
 }
 
+.overlay.overlay--floating {
+  background: none;
+}
+
 .overlay__panel {
   width: min(90vw, 360px);
   padding: 24px;

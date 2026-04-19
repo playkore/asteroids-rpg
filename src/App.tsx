@@ -20,7 +20,6 @@ export default function App() {
     continueGame,
     loadGame,
     pauseGame,
-    resumeGame,
     openMenu,
     setMovement,
     restartCurrentGame,
@@ -97,7 +96,6 @@ export default function App() {
           onContinue={handleContinue}
           onNewGame={handleNewGame}
           onLoadGame={handleLoadGame}
-          onResume={phase === 'paused' ? resumeGame : undefined}
           saveBundle={saveBundle}
           paused={phase === 'paused'}
         />
