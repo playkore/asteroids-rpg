@@ -1,4 +1,5 @@
 import type { CellState, GameState, Ship } from './game';
+import { normalizeCellX } from './game';
 import type { PlayerStats } from './rpg';
 
 export type SaveSlotIndex = 0 | 1 | 2;
@@ -93,7 +94,7 @@ export function buildSaveSlotData(state: GameState, slot: SaveSlotIndex): SaveSl
     width: state.width,
     height: state.height,
     currentCell: {
-      x: state.currentCell.x,
+      x: normalizeCellX(state.currentCell.x),
       y: state.currentCell.y,
     },
     ship: { ...state.ship },

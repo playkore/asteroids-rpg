@@ -151,6 +151,8 @@ const CELL_CLEAR_XP = 3;
 const CELL_CLEAR_HEAL = 2;
 const PASSIVE_REGEN_INTERVAL_MS = 10000;
 const PASSIVE_REGEN_AMOUNT = 1;
+const WORLD_WIDTH = 7;
+const WORLD_MIN_Y = -4;
 
 const ASTEROID_RADIUS: Record<AsteroidSize, number> = {
   3: 56,
@@ -197,7 +199,7 @@ export function createGameState(
   const state: GameState = {
     seed: normalizeSeed(seed),
     slotIndex: options.slotIndex ?? null,
-    currentCell: options.currentCell ? { ...options.currentCell } : { x: 0, y: 0 },
+    currentCell: options.currentCell ? normalizeCellCoord(options.currentCell) : { x: 0, y: 0 },
     cells: cloneCellStateMap(options.cells ?? {}),
     ship: {
       x: Math.floor(width / 2),
@@ -362,7 +364,7 @@ export function buildHudState(state: GameState, ready: boolean): HudState {
 }
 
 export function cellKey(cell: CellCoord) {
-  return `${cell.x}:${cell.y}`;
+  return `${normalizeCellX(cell.x)}:${cell.y}`;
 }
 
 export function getCellLevel(cell: CellCoord) {
@@ -370,7 +372,9 @@ export function getCellLevel(cell: CellCoord) {
 }
 
 export function generateCellRecord(seed: string, cell: CellCoord): CellState {
-  if (cell.y < 0) {
+  const normalizedCell = normalizeCellCoord(cell);
+
+  if (normalizedCell.y < 0) {
     return {
       kind: 'empty',
       visited: false,
@@ -383,7 +387,7 @@ export function generateCellRecord(seed: string, cell: CellCoord): CellState {
     };
   }
 
-  const random = createSeededRandom(deriveSeed(seed, cellKey(cell)));
+  const random = createSeededRandom(deriveSeed(seed, cellKey(normalizedCell)));
   const combat = random() < 0.25;
   return {
     kind: combat ? 'combat' : 'empty',
@@ -550,9 +554,12 @@ function handleCellTransitions(state: GameState, now: number) {
 
     saveCurrentCellProgress(state);
     const nextCell = {
-      x: state.currentCell.x + delta.dx,
+      x: normalizeCellX(state.currentCell.x + delta.dx),
       y: state.currentCell.y + delta.dy,
     };
+    if (nextCell.y < WORLD_MIN_Y) {
+      nextCell.y = WORLD_MIN_Y;
+    }
 
     state.currentCell = nextCell;
     state.ship.x = delta.nextX;
@@ -771,7 +778,7 @@ function createAsteroid(
 function spawnChildAsteroids(state: GameState, asteroid: Asteroid) {
   const childSize = (asteroid.size - 1) as AsteroidSize;
   const random = createSeededRandom(
-    deriveSeed(state.seed, `${state.currentCell.x}:${state.currentCell.y}:${state.spawnCounter}:${asteroid.size}:${asteroid.hp}`),
+    deriveSeed(state.seed, `${normalizeCellX(state.currentCell.x)}:${state.currentCell.y}:${state.spawnCounter}:${asteroid.size}:${asteroid.hp}`),
   );
   state.spawnCounter += 1;
   const children: Asteroid[] = [];
@@ -796,6 +803,17 @@ function spawnChildAsteroids(state: GameState, asteroid: Asteroid) {
   }
 
   return children;
+}
+
+export function normalizeCellX(x: number) {
+  return ((x % WORLD_WIDTH) + WORLD_WIDTH) % WORLD_WIDTH;
+}
+
+export function normalizeCellCoord(cell: CellCoord) {
+  return {
+    x: normalizeCellX(cell.x),
+    y: cell.y,
+  };
 }
 
 function getAsteroidHp(level: number, size: AsteroidSize) {

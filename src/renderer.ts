@@ -1,4 +1,5 @@
 import type { Asteroid, Bullet, GameState, Ship } from './game';
+import { normalizeCellX } from './game';
 import { UI_LINE_COLOR, UI_LINE_WIDTH } from './constants';
 
 type AsteroidPoint = {
@@ -217,7 +218,7 @@ export function buildMiniMapLayout(state: GameState, width: number, height: numb
 
   for (let row = 0; row < size; row += 1) {
     for (let col = 0; col < size; col += 1) {
-      const x = state.currentCell.x + col - half;
+      const x = normalizeCellX(state.currentCell.x + col - half);
       const y = state.currentCell.y + half - row;
       const key = `${x}:${y}`;
       const cell = state.cells[key];

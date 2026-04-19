@@ -120,15 +120,21 @@ describe('drawGame', () => {
 
   it('always centers the current cell in a 7x7 mini-map layout', () => {
     const state = createGameState(320, 240);
-    state.currentCell = { x: 10, y: 0 };
+    state.currentCell = { x: 6, y: 0 };
     state.cells = {
-      '10:0': {
+      '6:0': {
         kind: 'combat',
         visited: true,
         cleared: false,
         remaining: { 3: 1, 2: 0, 1: 0 },
       },
-      '10:-1': {
+      '0:0': {
+        kind: 'combat',
+        visited: true,
+        cleared: false,
+        remaining: { 3: 0, 2: 1, 1: 0 },
+      },
+      '6:-1': {
         kind: 'empty',
         visited: true,
         cleared: false,
@@ -139,8 +145,8 @@ describe('drawGame', () => {
     const layout = buildMiniMapLayout(state, 160, 160);
 
     expect(layout.cells).toHaveLength(49);
-    expect(layout.cells[24]?.key).toBe('10:0');
+    expect(layout.cells[24]?.key).toBe('6:0');
     expect(layout.cells[24]?.current).toBe(true);
-    expect(layout.cells.some((cell) => cell.key === '10:-1')).toBe(true);
+    expect(layout.cells.some((cell) => cell.key === '0:0')).toBe(true);
   });
 });
