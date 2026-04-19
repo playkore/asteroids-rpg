@@ -44,8 +44,6 @@ export function drawMiniMap(
 
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, width, height);
-  ctx.fillStyle = '#05070c';
-  ctx.fillRect(0, 0, width, height);
   ctx.strokeStyle = UI_LINE_COLOR;
   ctx.lineWidth = UI_LINE_WIDTH;
   ctx.strokeRect(0, 0, width, height);

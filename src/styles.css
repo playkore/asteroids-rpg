@@ -64,7 +64,7 @@ button {
   width: min(22vw, 160px);
   height: min(22vw, 160px);
   display: block;
-  background: #05070c;
+  background: transparent;
   border: var(--ui-line-width) solid var(--ui-line-color);
   z-index: 3;
   pointer-events: none;
@@ -90,7 +90,7 @@ button {
   padding: 8px 10px;
   border-radius: 12px;
   border: var(--ui-line-width) solid var(--ui-line-color);
-  background: #070a10;
+  background: transparent;
 }
 
 .hud__pill--meter {
@@ -121,7 +121,7 @@ button {
   align-self: stretch;
   border: var(--ui-line-width) solid var(--ui-line-color);
   border-radius: 999px;
-  background: #090d13;
+  background: transparent;
   color: var(--text);
   padding: 10px 16px;
   letter-spacing: 0.12em;
@@ -153,7 +153,7 @@ button {
   border: var(--ui-line-width) solid var(--ui-line-color);
   border-radius: 999px;
   overflow: hidden;
-  background: #111720;
+  background: transparent;
 }
 
 .hud__meter-fill {

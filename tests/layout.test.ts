@@ -8,12 +8,15 @@ import {
 } from '../src/layout';
 
 describe('layout', () => {
-  it('creates a square game field below the HUD', () => {
+  it('creates a full-screen game field', () => {
     const layout = getGameCanvasLayout(1280, 900);
 
-    expect(layout.top).toBe(GAME_FIELD_TOP);
-    expect(layout.left).toBe(GAME_FIELD_LEFT);
-    expect(layout.size).toBe(750);
+    expect(layout).toEqual({
+      top: GAME_FIELD_TOP,
+      left: GAME_FIELD_LEFT,
+      width: 1280,
+      height: 900,
+    });
   });
 
   it('prefers visual viewport dimensions on mobile browsers', () => {
@@ -29,7 +32,8 @@ describe('layout', () => {
     expect(layout).toEqual({
       top: GAME_FIELD_TOP,
       left: GAME_FIELD_LEFT,
-      size: 366,
+      width: 390,
+      height: 780,
     });
   });
 

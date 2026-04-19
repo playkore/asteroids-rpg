@@ -97,17 +97,17 @@ export function useGameLoop() {
 
     const dpr = window.devicePixelRatio || 1;
     const layout = getViewportGameCanvasLayout(window);
-    canvas.width = Math.floor(layout.size * dpr);
-    canvas.height = Math.floor(layout.size * dpr);
+    canvas.width = Math.floor(layout.width * dpr);
+    canvas.height = Math.floor(layout.height * dpr);
     canvas.style.top = `${layout.top}px`;
     canvas.style.left = `${layout.left}px`;
     canvas.style.right = 'auto';
     canvas.style.bottom = 'auto';
-    canvas.style.width = `${layout.size}px`;
-    canvas.style.height = `${layout.size}px`;
+    canvas.style.width = `${layout.width}px`;
+    canvas.style.height = `${layout.height}px`;
 
     if (gameRef.current) {
-      resizeGameState(gameRef.current, layout.size, layout.size);
+      resizeGameState(gameRef.current, layout.width, layout.height);
     }
 
     const miniMapCanvas = miniMapRef.current;
@@ -178,8 +178,8 @@ export function useGameLoop() {
   }, []);
 
   const applyLoadedSave = useCallback((slot: SaveSlotIndex, snapshot: SaveSlotData) => {
-    const { size } = getViewportGameCanvasLayout(window);
-    gameRef.current = hydrateGameState(snapshot, size, size);
+    const { width, height } = getViewportGameCanvasLayout(window);
+    gameRef.current = hydrateGameState(snapshot, width, height);
     gameRef.current.slotIndex = slot;
     inputRef.current = createInputState();
     movementRef.current = {
@@ -209,8 +209,8 @@ export function useGameLoop() {
   }, [drawCurrentFrame]);
 
   const startNewGame = useCallback((seed: string, slot: SaveSlotIndex) => {
-    const { size } = getViewportGameCanvasLayout(window);
-    const game = createGameState(size, size, seed, {
+    const { width, height } = getViewportGameCanvasLayout(window);
+    const game = createGameState(width, height, seed, {
       slotIndex: slot,
     });
     gameRef.current = game;
