@@ -239,8 +239,10 @@ function drawFlashes(ctx: CanvasRenderingContext2D, flashes: FlashEffect[], now:
 
     ctx.save();
     ctx.translate(flash.x, flash.y);
+    ctx.fillStyle = UI_LINE_COLOR;
     ctx.beginPath();
     ctx.arc(0, 0, flash.radius, 0, Math.PI * 2);
+    ctx.fill();
     ctx.stroke();
     ctx.beginPath();
     ctx.moveTo(-flash.radius, 0);

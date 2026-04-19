@@ -158,6 +158,7 @@ describe('drawGame', () => {
     expect(firstTranslate[1]).not.toBe(0);
     expect((ctx.translate as any).mock.calls.some(([x, y]: [number, number]) => x === 160 && y === 120)).toBe(true);
     expect(ctx.scale).toHaveBeenCalled();
+    expect(ctx.fill).toHaveBeenCalled();
     expect(ctx.lineTo).toHaveBeenCalled();
     expect(ctx.arc).toHaveBeenCalled();
   });
