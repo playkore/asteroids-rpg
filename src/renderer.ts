@@ -34,6 +34,7 @@ export function drawGame(
 export function drawMiniMap(
   ctx: CanvasRenderingContext2D,
   state: GameState,
+  now: number,
   dpr: number,
   width: number,
   height: number,
@@ -49,19 +50,31 @@ export function drawMiniMap(
   ctx.strokeRect(0, 0, width, height);
 
   for (const cell of layout.cells) {
-    const fill = cell.visited ? '#f5f9ff' : '#05070c';
-    ctx.fillStyle = fill;
-    ctx.fillRect(cell.x, cell.y, layout.cellSize, layout.cellSize);
-    ctx.strokeStyle = cell.current ? '#f5f9ff' : '#8f99a6';
-    ctx.lineWidth = cell.current ? UI_LINE_WIDTH : 1.5;
-    ctx.strokeRect(cell.x, cell.y, layout.cellSize, layout.cellSize);
-
-    if (cell.visited && cell.remaining > 0) {
-      ctx.fillStyle = '#05070c';
-      ctx.beginPath();
-      ctx.arc(cell.x + layout.cellSize / 2, cell.y + layout.cellSize / 2, 2.5, 0, Math.PI * 2);
-      ctx.fill();
+    if (!cell.visited) {
+      continue;
     }
+
+    if (cell.current) {
+      const inset = Math.max(1, Math.floor(layout.cellSize * 0.06));
+      ctx.strokeStyle = '#f5f9ff';
+      ctx.lineWidth = UI_LINE_WIDTH;
+      ctx.beginPath();
+      ctx.moveTo(cell.x + inset, cell.y + inset);
+      ctx.lineTo(cell.x + layout.cellSize - inset, cell.y + layout.cellSize - inset);
+      ctx.moveTo(cell.x + inset, cell.y + layout.cellSize - inset);
+      ctx.lineTo(cell.x + layout.cellSize - inset, cell.y + inset);
+      ctx.stroke();
+      continue;
+    }
+
+    if (cell.remaining > 0) {
+      ctx.fillStyle = '#f5f9ff';
+      ctx.fillRect(cell.x, cell.y, layout.cellSize, layout.cellSize);
+    }
+
+    ctx.strokeStyle = '#f5f9ff';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(cell.x, cell.y, layout.cellSize, layout.cellSize);
   }
 }
 

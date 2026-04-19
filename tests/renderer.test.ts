@@ -95,19 +95,27 @@ describe('drawGame', () => {
         cleared: true,
         remaining: { 3: 0, 2: 0, 1: 0 },
       },
+      '0:1': {
+        kind: 'combat',
+        visited: false,
+        cleared: false,
+        remaining: { 3: 3, 2: 0, 1: 0 },
+      },
     };
     state.currentCell = current;
     state.asteroids = [];
 
-    drawMiniMap(ctx, state, 1, 160, 160);
+    drawMiniMap(ctx, state, 0, 1, 160, 160);
 
     expect(ctx.strokeRect).toHaveBeenCalled();
-    expect(ctx.arc).toHaveBeenCalled();
-    expect(ctx.fillRect).toHaveBeenCalled();
+    expect(ctx.fillRect).toHaveBeenCalledTimes(1);
+    expect(ctx.strokeStyle).toBe('#f5f9ff');
+    expect(ctx.lineTo).toHaveBeenCalledTimes(2);
     expect(buildMiniMapLayout(state, 160, 160).cells).toHaveLength(49);
     const centerCell = buildMiniMapLayout(state, 160, 160).cells[24];
     expect(centerCell?.current).toBe(true);
     expect(centerCell?.key).toBe('0:0');
+    expect(ctx.strokeRect).toHaveBeenCalledTimes(2);
   });
 
   it('always centers the current cell in a 7x7 mini-map layout', () => {

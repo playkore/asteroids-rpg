@@ -136,6 +136,7 @@ export function useGameLoop() {
         drawMiniMap(
           miniCtx,
           game,
+          performance.now(),
           window.devicePixelRatio || 1,
           miniMapCanvas.clientWidth,
           miniMapCanvas.clientHeight,
@@ -377,6 +378,7 @@ export function useGameLoop() {
           drawMiniMap(
             miniCtx,
             game,
+            now,
             window.devicePixelRatio || 1,
             miniMapCanvas.clientWidth,
             miniMapCanvas.clientHeight,
