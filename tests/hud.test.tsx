@@ -29,11 +29,11 @@ describe('Hud', () => {
 
     expect(markup).toContain('HP');
     expect(markup).toContain('XP');
-    expect(markup).toContain('SECTOR ECHO-Z3');
+    expect(markup).toContain('ECHO-Z3');
     expect(markup).toContain('12 / 38');
     expect(markup).toContain('ECHO-Z3');
     expect(markup).not.toContain('CINDER-5D');
-    expect(markup).toContain('<span class="hud__sector-title">SECTOR ECHO-Z3</span>');
+    expect(markup).toContain('<span class="hud__sector-title">ECHO-Z3</span>');
   });
 
   it('shows clear when there are no sector asteroids', () => {

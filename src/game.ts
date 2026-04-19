@@ -425,14 +425,6 @@ export function generateCellRecord(seed: string, cell: CellCoord): CellState {
   };
 }
 
-export function countAsteroidsBySize(asteroids: Asteroid[]): RemainingAsteroids {
-  return {
-    3: asteroids.filter((asteroid) => asteroid.size === 3).length,
-    2: asteroids.filter((asteroid) => asteroid.size === 2).length,
-    1: asteroids.filter((asteroid) => asteroid.size === 1).length,
-  };
-}
-
 export function totalAsteroids(remaining: RemainingAsteroids) {
   return remaining[3] + remaining[2] + remaining[1];
 }

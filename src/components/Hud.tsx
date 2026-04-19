@@ -21,7 +21,7 @@ export default function Hud({
 }) {
   const xpMax = xpToNextLevel(hud.player.level);
   const hasSectorAsteroids = hud.sectorHasAsteroids && hud.sectorAsteroidHpTotal > 0;
-  const sectorTitle = hud.cell.y < 0 ? 'SECTOR VOID' : `SECTOR ${formatHudCellCoord(hud.cell.x, hud.cell.y)}`;
+  const sectorTitle = hud.cell.y < 0 ? 'SECTOR VOID' : `${formatHudCellCoord(hud.cell.x, hud.cell.y)}`;
 
   return (
     <div className="hud" style={style}>

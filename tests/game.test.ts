@@ -240,6 +240,59 @@ describe('game logic', () => {
     expect(state.saveRequested).toBe(true);
   });
 
+  it('resets an uncompleted combat cell to three large asteroids when revisited', () => {
+    const state = createGameState(320, 240, 'CINDER-5D');
+    state.cells[cellKey(state.currentCell)] = {
+      kind: 'combat',
+      visited: true,
+      cleared: false,
+      remaining: { 3: 3, 2: 0, 1: 0 },
+    };
+    state.asteroids = [
+      {
+        x: 160,
+        y: 120,
+        vx: 0,
+        vy: 0,
+        size: 3,
+        radius: 56,
+        hp: 12,
+        maxHp: 12,
+        xpReward: 4,
+        contactDamage: 3,
+        hpVisible: false,
+      },
+    ];
+    state.ship.x = 160;
+    state.ship.y = -1;
+    state.ship.vx = 0;
+    state.ship.vy = 0;
+    state.transitionCooldownUntil = 0;
+    state.ship.invulnerableUntil = 0;
+
+    updateGame(state, createInputState(), 0, 1000);
+
+    expect(state.currentCell).toEqual({ x: 0, y: 1 });
+    expect(state.cells[cellKey({ x: 0, y: 0 })]?.remaining).toEqual({
+      3: 3,
+      2: 0,
+      1: 0,
+    });
+
+    state.ship.x = 160;
+    state.ship.y = 241;
+    state.ship.vx = 0;
+    state.ship.vy = 0;
+    state.transitionCooldownUntil = 0;
+    state.ship.invulnerableUntil = 0;
+
+    updateGame(state, createInputState(), 0, 2000);
+
+    expect(state.currentCell).toEqual({ x: 0, y: 0 });
+    expect(state.asteroids).toHaveLength(3);
+    expect(state.asteroids.every((asteroid) => asteroid.size === 3)).toBe(true);
+  });
+
   it('spawns asteroids in the center of a new combat cell with varied directions', () => {
     const state = createGameState(320, 240, 'CINDER-5D');
     state.cells[cellKey(state.currentCell)] = {
@@ -511,7 +564,7 @@ describe('game logic', () => {
     expect(state.gameOver).toBe(true);
   });
 
-  it('hydrates a partially cleared cell from saved counts', () => {
+  it('hydrates a combat cell but resets it to the original large asteroids when saving progress', () => {
     const snapshot: SaveSlotData = {
       version: 1,
       seed: 'CINDER-5D',
@@ -558,12 +611,12 @@ describe('game logic', () => {
 
     expect(hydrated.currentCell).toEqual({ x: 1, y: 2 });
     expect(hydrated.asteroids).toHaveLength(3);
-    expect(hydrated.asteroids.map((asteroid) => asteroid.size).sort()).toEqual([1, 2, 2]);
+    expect(hydrated.asteroids.every((asteroid) => asteroid.size === 2 || asteroid.size === 1)).toBe(true);
     prepareGameStateForSave(hydrated);
     expect(hydrated.cells['1:2']?.remaining).toEqual({
-      3: 0,
-      2: 2,
-      1: 1,
+      3: 3,
+      2: 0,
+      1: 0,
     });
   });
 
