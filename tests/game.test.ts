@@ -434,4 +434,56 @@ describe('game logic', () => {
       1: 1,
     });
   });
+
+  it('hydrates using the current canvas size when provided', () => {
+    const snapshot: SaveSlotData = {
+      version: 1,
+      seed: 'CINDER-5D',
+      width: 320,
+      height: 240,
+      currentCell: { x: 1, y: 2 },
+      ship: {
+        x: 160,
+        y: 120,
+        vx: 0,
+        vy: 0,
+        angle: 0,
+        invulnerableUntil: 0,
+        alive: true,
+      },
+      player: {
+        level: 2,
+        xp: 3,
+        hp: 12,
+        maxHp: 12,
+        attack: 3,
+      },
+      nextShotAt: 0,
+      transitionCooldownUntil: 0,
+      regenAccumulator: 0,
+      spawnCounter: 0,
+      gameOver: false,
+      cells: {
+        '1:2': {
+          kind: 'combat',
+          visited: true,
+          cleared: false,
+          remaining: {
+            3: 0,
+            2: 2,
+            1: 1,
+          },
+        },
+      },
+      savedAt: 0,
+    };
+
+    const hydrated = hydrateGameState(snapshot, 200, 200);
+
+    expect(hydrated.width).toBe(200);
+    expect(hydrated.height).toBe(200);
+    expect(hydrated.asteroids).toHaveLength(3);
+    expect(hydrated.asteroids.every((asteroid) => asteroid.x >= 20 && asteroid.x <= 180)).toBe(true);
+    expect(hydrated.asteroids.every((asteroid) => asteroid.y >= 20 && asteroid.y <= 180)).toBe(true);
+  });
 });

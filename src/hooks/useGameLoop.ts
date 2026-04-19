@@ -27,7 +27,7 @@ import {
   writeSaveBundle,
 } from '../save';
 import { drawGame, drawMiniMap } from '../renderer';
-import { getGameCanvasLayout } from '../layout';
+import { getViewportGameCanvasLayout } from '../layout';
 import type { JoystickVector } from './useJoystickInput';
 
 const INITIAL_HUD: HudState = {
@@ -91,10 +91,8 @@ export function useGameLoop() {
       return;
     }
 
-    const width = window.innerWidth;
-    const height = window.innerHeight;
     const dpr = window.devicePixelRatio || 1;
-    const layout = getGameCanvasLayout(width, height);
+    const layout = getViewportGameCanvasLayout(window);
     canvas.width = Math.floor(layout.size * dpr);
     canvas.height = Math.floor(layout.size * dpr);
     canvas.style.top = `${layout.top}px`;
@@ -176,7 +174,8 @@ export function useGameLoop() {
   }, []);
 
   const applyLoadedSave = useCallback((slot: SaveSlotIndex, snapshot: SaveSlotData) => {
-    gameRef.current = hydrateGameState(snapshot);
+    const { size } = getViewportGameCanvasLayout(window);
+    gameRef.current = hydrateGameState(snapshot, size, size);
     gameRef.current.slotIndex = slot;
     inputRef.current = createInputState();
     movementRef.current = {
@@ -206,7 +205,8 @@ export function useGameLoop() {
   }, [drawCurrentFrame]);
 
   const startNewGame = useCallback((seed: string, slot: SaveSlotIndex) => {
-    const game = createGameState(window.innerWidth, window.innerHeight, seed, {
+    const { size } = getViewportGameCanvasLayout(window);
+    const game = createGameState(size, size, seed, {
       slotIndex: slot,
     });
     gameRef.current = game;
@@ -317,8 +317,12 @@ export function useGameLoop() {
 
     resize();
     window.addEventListener('resize', resize);
+    window.visualViewport?.addEventListener('resize', resize);
+    window.visualViewport?.addEventListener('scroll', resize);
     return () => {
       window.removeEventListener('resize', resize);
+      window.visualViewport?.removeEventListener('resize', resize);
+      window.visualViewport?.removeEventListener('scroll', resize);
     };
   }, [drawCurrentFrame, syncCanvasSize]);
 

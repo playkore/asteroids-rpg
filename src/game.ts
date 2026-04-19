@@ -236,8 +236,12 @@ export function createGameState(
   return state;
 }
 
-export function hydrateGameState(snapshot: SaveSlotData): GameState {
-  return createGameState(snapshot.width, snapshot.height, snapshot.seed, {
+export function hydrateGameState(
+  snapshot: SaveSlotData,
+  width = snapshot.width,
+  height = snapshot.height,
+): GameState {
+  return createGameState(width, height, snapshot.seed, {
     slotIndex: null,
     currentCell: snapshot.currentCell,
     player: snapshot.player,
