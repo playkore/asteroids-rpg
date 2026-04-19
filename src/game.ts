@@ -1,4 +1,4 @@
-import { createSeededRandom, deriveSeed, generateSeed, normalizeSeed } from './seed';
+import { createSeededRandom, generateSeed, normalizeSeed } from './seed';
 import { createPlayerStats, gainPlayerXp, type PlayerStats } from './rpg';
 import type { SaveSlotData, SaveSlotIndex } from './save';
 
@@ -387,7 +387,9 @@ export function generateCellRecord(seed: string, cell: CellCoord): CellState {
     };
   }
 
-  const random = createSeededRandom(deriveSeed(seed, cellKey(normalizedCell)));
+  const random = createSeededRandom(
+    `${normalizeSeed(seed)}|cell:${normalizedCell.x}:${normalizedCell.y}`,
+  );
   const combat = random() < 0.25;
   return {
     kind: combat ? 'combat' : 'empty',
@@ -722,7 +724,7 @@ function ensureCellExists(state: GameState, cell: CellCoord) {
 function spawnAsteroidsForCell(context: CellSpawnContext, remaining: RemainingAsteroids) {
   const asteroids: Asteroid[] = [];
   const random = createSeededRandom(
-    deriveSeed(context.seed, `${context.cell.x}:${context.cell.y}:${context.spawnCounter}:${context.level}`),
+    `${normalizeSeed(context.seed)}|spawn:${normalizeCellX(context.cell.x)}:${context.cell.y}:${context.spawnCounter}:${context.level}`,
   );
 
   const spawnCount = (size: AsteroidSize, count: number) => {
@@ -778,7 +780,7 @@ function createAsteroid(
 function spawnChildAsteroids(state: GameState, asteroid: Asteroid) {
   const childSize = (asteroid.size - 1) as AsteroidSize;
   const random = createSeededRandom(
-    deriveSeed(state.seed, `${normalizeCellX(state.currentCell.x)}:${state.currentCell.y}:${state.spawnCounter}:${asteroid.size}:${asteroid.hp}`),
+    `${normalizeSeed(state.seed)}|child:${normalizeCellX(state.currentCell.x)}:${state.currentCell.y}:${state.spawnCounter}:${asteroid.size}:${asteroid.hp}`,
   );
   state.spawnCounter += 1;
   const children: Asteroid[] = [];

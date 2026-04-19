@@ -30,6 +30,25 @@ describe('game logic', () => {
     expect(cell.remaining).toEqual({ 3: 0, 2: 0, 1: 0 });
   });
 
+  it('can still generate combat cells deep in positive y', () => {
+    const cell = generateCellRecord('CINDER-5D', { x: 1, y: 13 });
+
+    expect(cell.kind).toBe('combat');
+    expect(cell.remaining).toEqual({ 3: 3, 2: 0, 1: 0 });
+  });
+
+  it('generates combat cells on 254 of the first 1000 levels for x=0', () => {
+    let combatCount = 0;
+
+    for (let y = 0; y < 1000; y += 1) {
+      if (generateCellRecord('CINDER-5D', { x: 0, y }).kind === 'combat') {
+        combatCount += 1;
+      }
+    }
+
+    expect(combatCount).toBe(254);
+  });
+
   it('only auto shoots when there are asteroids in the field', () => {
     const emptyState = createGameState(320, 240, 'CINDER-5D');
     emptyState.asteroids = [];
