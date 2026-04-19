@@ -532,10 +532,18 @@ function handleCellTransitions(state: GameState, now: number) {
     }
 
     saveCurrentCellProgress(state);
-    state.currentCell = {
+    const nextCell = {
       x: state.currentCell.x + delta.dx,
       y: state.currentCell.y + delta.dy,
     };
+    if (nextCell.y < 0) {
+      state.ship.x = clamp(state.ship.x, 0, state.width);
+      state.ship.y = Math.min(state.height - 1, Math.max(0, state.ship.y));
+      state.ship.vy = Math.min(0, state.ship.vy);
+      return;
+    }
+
+    state.currentCell = nextCell;
     state.ship.x = delta.nextX;
     state.ship.y = delta.nextY;
     state.ship.vx *= 0.92;
@@ -562,10 +570,10 @@ function getCellDelta(x: number, y: number, width: number, height: number) {
   }
 
   if (y < 0) {
-    dy = -1;
+    dy = 1;
     nextY = y + height;
   } else if (y >= height) {
-    dy = 1;
+    dy = -1;
     nextY = y - height;
   }
 

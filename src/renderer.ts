@@ -51,7 +51,7 @@ export function drawMiniMap(
   for (const cell of layout.cells) {
     const fill = cell.visited ? '#f5f9ff' : '#05070c';
     ctx.fillStyle = fill;
-      ctx.fillRect(cell.x, cell.y, layout.cellSize, layout.cellSize);
+    ctx.fillRect(cell.x, cell.y, layout.cellSize, layout.cellSize);
     ctx.strokeStyle = cell.current ? '#f5f9ff' : '#8f99a6';
     ctx.lineWidth = cell.current ? UI_LINE_WIDTH : 1.5;
     ctx.strokeRect(cell.x, cell.y, layout.cellSize, layout.cellSize);
@@ -200,7 +200,7 @@ type MiniMapCell = {
   current: boolean;
 };
 
-function buildMiniMapLayout(state: GameState, width: number, height: number) {
+export function buildMiniMapLayout(state: GameState, width: number, height: number) {
   const cellKeys = Object.keys(state.cells);
   const xs = cellKeys.map((key) => Number(key.split(':')[0]));
   const ys = cellKeys.map((key) => Number(key.split(':')[1]));
@@ -209,7 +209,7 @@ function buildMiniMapLayout(state: GameState, width: number, height: number) {
 
   const minX = Math.min(...xs) - 1;
   const maxX = Math.max(...xs) + 1;
-  const minY = Math.min(...ys) - 1;
+  const minY = Math.max(0, Math.min(...ys) - 1);
   const maxY = Math.max(...ys) + 1;
 
   const cols = maxX - minX + 1;

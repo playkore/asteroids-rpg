@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createGameState } from '../src/game';
-import { asteroidShape, drawGame, drawMiniMap } from '../src/renderer';
+import { asteroidShape, buildMiniMapLayout, drawGame, drawMiniMap } from '../src/renderer';
 import { UI_LINE_COLOR, UI_LINE_WIDTH } from '../src/constants';
 
 function createMockContext() {
@@ -103,5 +103,28 @@ describe('drawGame', () => {
     expect(ctx.strokeRect).toHaveBeenCalled();
     expect(ctx.arc).toHaveBeenCalled();
     expect(ctx.fillRect).toHaveBeenCalled();
+  });
+
+  it('does not include cells below y=0 in the mini-map layout', () => {
+    const state = createGameState(320, 240);
+    state.currentCell = { x: 0, y: 0 };
+    state.cells = {
+      '0:0': {
+        kind: 'combat',
+        visited: true,
+        cleared: false,
+        remaining: { 3: 1, 2: 0, 1: 0 },
+      },
+      '0:1': {
+        kind: 'combat',
+        visited: true,
+        cleared: false,
+        remaining: { 3: 1, 2: 0, 1: 0 },
+      },
+    };
+
+    const layout = buildMiniMapLayout(state, 160, 160);
+
+    expect(layout.cells.every((cell) => Number(cell.key.split(':')[1]) >= 0)).toBe(true);
   });
 });

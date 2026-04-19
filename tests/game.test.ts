@@ -22,7 +22,7 @@ describe('game logic', () => {
     expect(first).toEqual(second);
   });
 
-  it('moves the player into a neighboring cell when crossing an edge', () => {
+  it('moves the player into the cell above when crossing the top edge', () => {
     const state = createGameState(320, 240, 'CINDER-5D');
     state.cells[cellKey(state.currentCell)] = {
       kind: 'empty',
@@ -31,8 +31,8 @@ describe('game logic', () => {
       remaining: { 3: 0, 2: 0, 1: 0 },
     };
     state.asteroids = [];
-    state.ship.x = -1;
-    state.ship.y = 120;
+    state.ship.x = 160;
+    state.ship.y = -1;
     state.ship.vx = 0;
     state.ship.vy = 0;
     state.transitionCooldownUntil = 0;
@@ -40,10 +40,32 @@ describe('game logic', () => {
 
     updateGame(state, createInputState(), 0, 1000);
 
-    expect(state.currentCell).toEqual({ x: -1, y: 0 });
-    expect(state.ship.x).toBeCloseTo(319);
-    expect(state.cells[cellKey({ x: -1, y: 0 })]).toBeTruthy();
+    expect(state.currentCell).toEqual({ x: 0, y: 1 });
+    expect(state.ship.y).toBeCloseTo(239);
+    expect(state.cells[cellKey({ x: 0, y: 1 })]).toBeTruthy();
     expect(state.saveRequested).toBe(true);
+  });
+
+  it('keeps the player in the bottom row when trying to move below y=0', () => {
+    const state = createGameState(320, 240, 'CINDER-5D');
+    state.cells[cellKey(state.currentCell)] = {
+      kind: 'empty',
+      visited: true,
+      cleared: false,
+      remaining: { 3: 0, 2: 0, 1: 0 },
+    };
+    state.asteroids = [];
+    state.ship.x = 160;
+    state.ship.y = 241;
+    state.ship.vx = 0;
+    state.ship.vy = 0;
+    state.transitionCooldownUntil = 0;
+    state.ship.invulnerableUntil = 0;
+
+    updateGame(state, createInputState(), 0, 1000);
+
+    expect(state.currentCell).toEqual({ x: 0, y: 0 });
+    expect(state.ship.y).toBe(239);
   });
 
   it('wraps asteroids around the screen', () => {

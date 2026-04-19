@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   buildHudState,
-  buildMapState,
   createGameState,
   createInputState,
   hydrateGameState,
@@ -13,7 +12,6 @@ import {
   type GameState,
   type HudState,
   type InputState,
-  type MapState,
 } from '../game';
 import { createPlayerStats } from '../rpg';
 import {
@@ -75,14 +73,12 @@ export function useGameLoop() {
   const lastFrameRef = useRef<number | null>(null);
   const [hud, setHud] = useState<HudState>(INITIAL_HUD);
   const [phase, setPhase] = useState<GamePhase>('menu');
-  const [mapOpen, setMapOpen] = useState(false);
   const [saveBundle, setSaveBundle] = useState<SaveBundle>(() => {
     const storage = getStorage();
     return storage ? readSaveBundle(storage) : createEmptySaveBundle();
   });
 
   const activeSlot = gameRef.current?.slotIndex ?? null;
-  const mapState: MapState | null = gameRef.current ? buildMapState(gameRef.current) : null;
 
   const syncCanvasSize = useCallback(() => {
     const canvas = canvasRef.current;
@@ -182,7 +178,6 @@ export function useGameLoop() {
     lastFrameRef.current = null;
     setHud(buildHudState(gameRef.current, true));
     setPhase('playing');
-    setMapOpen(false);
     const storage = getStorage();
     setSaveBundle((current) => {
       const nextBundle = {
@@ -215,7 +210,6 @@ export function useGameLoop() {
     lastFrameRef.current = null;
     setHud(buildHudState(game, true));
     setPhase('playing');
-    setMapOpen(false);
     const storage = getStorage();
     const nextData = buildSaveSlotData(game, slot);
     setSaveBundle((current) => {
@@ -254,7 +248,6 @@ export function useGameLoop() {
     }
     persistCurrentRun();
     setPhase('paused');
-    setMapOpen(false);
     inputRef.current = createPausedInput();
     lastFrameRef.current = null;
     drawCurrentFrame();
@@ -274,42 +267,10 @@ export function useGameLoop() {
       pauseGame();
       return;
     }
-    setMapOpen(false);
     setPhase('menu');
     lastFrameRef.current = null;
     drawCurrentFrame();
   }, [drawCurrentFrame, pauseGame, phase]);
-
-  const openMap = useCallback(() => {
-    if (phase !== 'playing') {
-      return;
-    }
-    persistCurrentRun();
-    setMapOpen(true);
-    setPhase('paused');
-    lastFrameRef.current = null;
-    drawCurrentFrame();
-  }, [drawCurrentFrame, phase, persistCurrentRun]);
-
-  const closeMap = useCallback(() => {
-    if (!mapOpen) {
-      return;
-    }
-    setMapOpen(false);
-    if (gameRef.current && phase === 'paused') {
-      setPhase('playing');
-      lastFrameRef.current = null;
-      drawCurrentFrame();
-    }
-  }, [drawCurrentFrame, mapOpen, phase]);
-
-  const toggleMap = useCallback(() => {
-    if (mapOpen) {
-      closeMap();
-    } else {
-      openMap();
-    }
-  }, [closeMap, mapOpen, openMap]);
 
   const restartCurrentGame = useCallback(() => {
     if (!gameRef.current) {
@@ -328,7 +289,6 @@ export function useGameLoop() {
     lastFrameRef.current = null;
     setHud(buildHudState(gameRef.current, true));
     setPhase('playing');
-    setMapOpen(false);
     persistCurrentRun();
     drawCurrentFrame();
   }, [drawCurrentFrame, persistCurrentRun]);
@@ -456,9 +416,7 @@ export function useGameLoop() {
     canvasRef,
     miniMapRef,
     hud,
-    mapState,
     phase,
-    mapOpen,
     saveBundle,
     activeSlot,
     startNewGame,
@@ -467,9 +425,6 @@ export function useGameLoop() {
     pauseGame,
     resumeGame,
     openMenu,
-    openMap,
-    closeMap,
-    toggleMap,
     setMovement: (movement: JoystickVector) => {
       movementRef.current = movement;
     },

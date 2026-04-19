@@ -1,8 +1,6 @@
 import { useEffect, useState } from 'react';
 import FloatingControls from './components/FloatingControls';
 import Hud from './components/Hud';
-import MapOverlay from './components/MapOverlay';
-import MapToggleButton from './components/MapToggleButton';
 import StartScreen from './components/StartScreen';
 import { useGameLoop } from './hooks/useGameLoop';
 import { generateSeed, normalizeSeed } from './seed';
@@ -13,9 +11,7 @@ export default function App() {
     canvasRef,
     miniMapRef,
     hud,
-    mapState,
     phase,
-    mapOpen,
     saveBundle,
     startNewGame,
     continueGame,
@@ -23,8 +19,6 @@ export default function App() {
     pauseGame,
     resumeGame,
     openMenu,
-    closeMap,
-    toggleMap,
     setMovement,
     restartCurrentGame,
   } = useGameLoop();
@@ -41,7 +35,7 @@ export default function App() {
     }
   }, [phase, setMovement]);
 
-  const menuVisible = phase === 'menu' || (phase === 'paused' && !mapOpen);
+  const menuVisible = phase === 'menu' || phase === 'paused';
   const gameVisible = phase === 'playing' || phase === 'paused';
 
   const handleNewGame = (slot: 0 | 1 | 2) => {
@@ -95,10 +89,6 @@ export default function App() {
           paused={phase === 'paused'}
         />
       ) : null}
-
-      {phase === 'playing' && !mapOpen ? <MapToggleButton open={false} onToggle={toggleMap} /> : null}
-
-      {mapOpen ? <MapOverlay mapState={mapState} onClose={closeMap} /> : null}
 
       {phase === 'gameover' ? (
         <div className="overlay">
