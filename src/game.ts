@@ -589,6 +589,9 @@ function resolveBulletHits(state: GameState) {
     }
 
     const asteroid = nextAsteroids[hitIndex]!;
+    const asteroidMass = ASTEROID_MASS[asteroid.size];
+    asteroid.vx += bullet.vx / asteroidMass;
+    asteroid.vy += bullet.vy / asteroidMass;
     asteroid.hp = Math.max(0, asteroid.hp - bullet.damage);
     asteroid.hpVisible = true;
 

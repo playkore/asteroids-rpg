@@ -697,6 +697,51 @@ describe('game logic', () => {
     expect(state.asteroids[0]?.vx).toBeCloseTo(4.96);
   });
 
+  it('pushes smaller asteroids faster than larger ones when hit by the same bullet', () => {
+    const createHitState = (size: 3 | 2 | 1) => {
+      const state = createGameState(320, 240, 'CINDER-5D');
+      state.ship.alive = false;
+      state.asteroids = [
+        {
+          x: 120,
+          y: 120,
+          vx: 0,
+          vy: 0,
+          size,
+          radius: size === 3 ? 56 : size === 2 ? 34 : 20,
+          hp: 12,
+          maxHp: 12,
+          xpReward: size === 3 ? 4 : size === 2 ? 2 : 1,
+          contactDamage: size === 3 ? 3 : size === 2 ? 2 : 1,
+          hpVisible: false,
+        },
+      ];
+      state.bullets = [
+        {
+          x: 120,
+          y: 120,
+          vx: 9,
+          vy: 0,
+          life: 1,
+          damage: 1,
+        },
+      ];
+      return state;
+    };
+
+    const small = createHitState(1);
+    const medium = createHitState(2);
+    const large = createHitState(3);
+
+    updateGame(small, createInputState(), 0, 1000);
+    updateGame(medium, createInputState(), 0, 1000);
+    updateGame(large, createInputState(), 0, 1000);
+
+    expect(small.asteroids[0]?.vx).toBeCloseTo(9);
+    expect(medium.asteroids[0]?.vx).toBeCloseTo(3);
+    expect(large.asteroids[0]?.vx).toBeCloseTo(1);
+  });
+
   it('hydrates a combat cell but resets it to the original large asteroids when saving progress', () => {
     const snapshot: SaveSlotData = {
       version: 1,
