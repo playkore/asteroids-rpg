@@ -1,4 +1,4 @@
-import type { Asteroid, Bullet, GameState, Ship } from './game';
+import type { Asteroid, Bullet, FlashEffect, GameState, Particle, Ship } from './game';
 import { normalizeCellX } from './game';
 import { UI_LINE_COLOR, UI_LINE_WIDTH } from './constants';
 
@@ -25,11 +25,20 @@ export function drawGame(
   ctx.fillStyle = '#05070c';
   ctx.fillRect(0, 0, width, height);
 
+  const shakeOffset = getShakeOffset(state, now);
+  ctx.save();
+  if (shakeOffset.x !== 0 || shakeOffset.y !== 0) {
+    ctx.translate(shakeOffset.x, shakeOffset.y);
+  }
+
   drawBackgroundGrid(ctx, width, height);
   drawArenaFrame(ctx, width, height);
-  drawAsteroids(ctx, state.asteroids);
-  drawBullets(ctx, state.bullets);
-  drawShip(ctx, state.ship, now, state.respawnBlinkUntil);
+  drawParticles(ctx, state.particles);
+  drawAsteroids(ctx, state.asteroids, now);
+  drawBullets(ctx, state.bullets, now);
+  drawFlashes(ctx, state.flashes, now);
+  drawShip(ctx, state.ship, now, state.respawnBlinkUntil, flameVisible);
+  ctx.restore();
 }
 
 export function drawMiniMap(
@@ -101,15 +110,22 @@ function drawBackgroundGrid(ctx: CanvasRenderingContext2D, width: number, height
   ctx.stroke();
 }
 
-function drawAsteroids(ctx: CanvasRenderingContext2D, asteroids: Asteroid[]) {
+function drawAsteroids(ctx: CanvasRenderingContext2D, asteroids: Asteroid[], now: number) {
   for (const asteroid of asteroids) {
     ctx.save();
     ctx.translate(asteroid.x, asteroid.y);
+    const hitFlashUntil = asteroid.hitFlashUntil ?? 0;
+    const hitScaleUntil = asteroid.hitScaleUntil ?? 0;
+    const hitFlash = now < hitFlashUntil;
+    const hitScale = now < hitScaleUntil ? 1.05 : 1;
+    if (hitScale !== 1) {
+      ctx.scale(hitScale, hitScale);
+    }
     ctx.fillStyle = '#05070c';
     beginAsteroidPath(ctx, asteroid);
     ctx.fill();
     ctx.strokeStyle = UI_LINE_COLOR;
-    ctx.lineWidth = UI_LINE_WIDTH;
+    ctx.lineWidth = hitFlash ? UI_LINE_WIDTH + 1 : UI_LINE_WIDTH;
     ctx.stroke();
 
     if (asteroid.hpVisible) {
@@ -136,18 +152,28 @@ function drawAsteroidHp(ctx: CanvasRenderingContext2D, asteroid: Asteroid) {
   ctx.fillRect(x + 1, y + 1, Math.max(0, (width - 2) * fill), height - 2);
 }
 
-function drawBullets(ctx: CanvasRenderingContext2D, bullets: Bullet[]) {
-  ctx.fillStyle = UI_LINE_COLOR;
+function drawBullets(ctx: CanvasRenderingContext2D, bullets: Bullet[], now: number) {
+  ctx.strokeStyle = UI_LINE_COLOR;
+  ctx.lineWidth = UI_LINE_WIDTH;
+  ctx.lineCap = 'round';
   for (const bullet of bullets) {
     ctx.beginPath();
-    ctx.arc(bullet.x, bullet.y, 2, 0, Math.PI * 2);
-    ctx.fill();
+    const trailScale = now < (bullet.trailUntil ?? 0) ? 0.035 : 0.02;
+    ctx.moveTo(bullet.x, bullet.y);
+    ctx.lineTo(bullet.x - bullet.vx * trailScale, bullet.y - bullet.vy * trailScale);
+    ctx.stroke();
   }
 }
 
 const RESPAWN_BLINK_PERIOD_MS = 180;
 
-function drawShip(ctx: CanvasRenderingContext2D, ship: Ship, now: number, respawnBlinkUntil: number) {
+function drawShip(
+  ctx: CanvasRenderingContext2D,
+  ship: Ship,
+  now: number,
+  respawnBlinkUntil: number,
+  flameVisible: boolean,
+) {
   if (!ship.alive) {
     return;
   }
@@ -159,6 +185,9 @@ function drawShip(ctx: CanvasRenderingContext2D, ship: Ship, now: number, respaw
   ctx.save();
   ctx.translate(ship.x, ship.y);
   ctx.rotate(ship.angle);
+  if (now < (ship.recoilUntil ?? 0)) {
+    ctx.scale(0.98, 1.02);
+  }
   ctx.strokeStyle = UI_LINE_COLOR;
   ctx.lineWidth = UI_LINE_WIDTH;
   ctx.lineJoin = 'round';
@@ -170,7 +199,73 @@ function drawShip(ctx: CanvasRenderingContext2D, ship: Ship, now: number, respaw
   ctx.lineTo(-12, 10);
   ctx.closePath();
   ctx.stroke();
+  if (flameVisible) {
+    ctx.beginPath();
+    ctx.moveTo(-12, -3);
+    ctx.lineTo(-18, 0);
+    ctx.lineTo(-12, 3);
+    ctx.stroke();
+  }
   ctx.restore();
+}
+
+function drawParticles(ctx: CanvasRenderingContext2D, particles: Particle[]) {
+  ctx.strokeStyle = UI_LINE_COLOR;
+  ctx.lineWidth = 1.5;
+  ctx.lineCap = 'round';
+
+  for (const particle of particles) {
+    const size = Math.max(1.2, particle.size * Math.max(0.35, particle.life / particle.maxLife));
+    const trail = particle.kind === 'muzzle' ? 0.04 : particle.kind === 'burst' ? 0.03 : 0.025;
+    ctx.beginPath();
+    ctx.moveTo(particle.x, particle.y);
+    ctx.lineTo(
+      particle.x - particle.vx * trail * size,
+      particle.y - particle.vy * trail * size,
+    );
+    ctx.stroke();
+  }
+}
+
+function drawFlashes(ctx: CanvasRenderingContext2D, flashes: FlashEffect[], now: number) {
+  ctx.strokeStyle = UI_LINE_COLOR;
+  ctx.lineWidth = UI_LINE_WIDTH;
+  ctx.lineCap = 'round';
+
+  for (const flash of flashes) {
+    if (now >= flash.until) {
+      continue;
+    }
+
+    ctx.save();
+    ctx.translate(flash.x, flash.y);
+    ctx.beginPath();
+    ctx.arc(0, 0, flash.radius, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(-flash.radius, 0);
+    ctx.lineTo(flash.radius, 0);
+    ctx.moveTo(0, -flash.radius);
+    ctx.lineTo(0, flash.radius);
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
+function getShakeOffset(state: GameState, now: number) {
+  if (now >= state.shake.until || state.shake.amplitude <= 0) {
+    return { x: 0, y: 0 };
+  }
+
+  const remaining = Math.max(0, state.shake.until - now);
+  const falloff = Math.min(1, remaining / 90);
+  const amplitude = state.shake.amplitude * falloff;
+  const t = now * 0.05;
+
+  return {
+    x: Math.sin(t) * amplitude,
+    y: Math.cos(t * 1.3) * amplitude,
+  };
 }
 
 function beginAsteroidPath(ctx: CanvasRenderingContext2D, asteroid: Asteroid) {

@@ -7,11 +7,11 @@ function createMockContext() {
   const arc = vi.fn();
   const fillRect = vi.fn();
   const strokeRect = vi.fn();
-  const lineWidths: number[] = [];
-  let currentLineWidth = 0;
-  const context = {
-    setTransform: vi.fn(),
-    clearRect: vi.fn(),
+    const lineWidths: number[] = [];
+    let currentLineWidth = 0;
+    const context = {
+      setTransform: vi.fn(),
+      clearRect: vi.fn(),
     fillRect,
     beginPath: vi.fn(),
     arc,
@@ -22,6 +22,7 @@ function createMockContext() {
     rect: vi.fn(),
     translate: vi.fn(),
     rotate: vi.fn(),
+    scale: vi.fn(),
     moveTo: vi.fn(),
     lineTo: vi.fn(),
     closePath: vi.fn(),
@@ -88,6 +89,77 @@ describe('drawGame', () => {
     drawGame(ctx, state, 180, 1, false);
 
     expect(ctx.translate).not.toHaveBeenCalled();
+  });
+
+  it('draws feedback effects with shake, streaks, flashes, and hit pulses', () => {
+    const ctx = createMockContext();
+    const state = createGameState(320, 240);
+    state.ship.x = 160;
+    state.ship.y = 120;
+    state.ship.angle = 0;
+    state.asteroids = [
+      {
+        x: 60,
+        y: 70,
+        vx: 0,
+        vy: 0,
+        size: 3,
+        radius: 56,
+        hp: 10,
+        maxHp: 12,
+        xpReward: 4,
+        contactDamage: 3,
+        hpVisible: true,
+        hitFlashUntil: 1100,
+        hitScaleUntil: 1100,
+      },
+    ];
+    state.bullets = [
+      {
+        x: 100,
+        y: 100,
+        vx: 200,
+        vy: 0,
+        life: 1,
+        damage: 1,
+        trailUntil: 1100,
+      },
+    ];
+    state.particles = [
+      {
+        x: 30,
+        y: 40,
+        vx: 50,
+        vy: 0,
+        life: 0.12,
+        maxLife: 0.24,
+        size: 2,
+        kind: 'spark',
+      },
+    ];
+    state.flashes = [
+      {
+        x: 80,
+        y: 90,
+        radius: 12,
+        until: 1100,
+      },
+    ];
+    state.shake = {
+      amplitude: 3,
+      until: 1100,
+    };
+
+    drawGame(ctx, state, 1000, 1, true);
+
+    expect(ctx.translate).toHaveBeenCalled();
+    const firstTranslate = (ctx.translate as any).mock.calls[0];
+    expect(firstTranslate[0]).not.toBe(0);
+    expect(firstTranslate[1]).not.toBe(0);
+    expect((ctx.translate as any).mock.calls.some(([x, y]: [number, number]) => x === 160 && y === 120)).toBe(true);
+    expect(ctx.scale).toHaveBeenCalled();
+    expect(ctx.lineTo).toHaveBeenCalled();
+    expect(ctx.arc).toHaveBeenCalled();
   });
 
   it('draws the mini-map with visited cells and a current cell marker', () => {

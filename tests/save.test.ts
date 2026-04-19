@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { createEmptySaveBundle, readSaveBundle, setSaveSlot, writeSaveBundle } from '../src/save';
+import { createGameState } from '../src/game';
+import {
+  buildSaveSlotData,
+  createEmptySaveBundle,
+  readSaveBundle,
+  setSaveSlot,
+  writeSaveBundle,
+} from '../src/save';
 
 function createStorage() {
   const store = new Map<string, string>();
@@ -28,6 +35,7 @@ describe('save bundle', () => {
         angle: 0,
         invulnerableUntil: 0,
         alive: true,
+        recoilUntil: 0,
       },
       player: {
         level: 1,
@@ -61,6 +69,15 @@ describe('save bundle', () => {
     expect(stored.slots[1]?.seed).toBe('CINDER-5D');
     expect(stored.slots[0]).toBeNull();
     expect(stored.slots[2]).toBeNull();
+  });
+
+  it('zeros transient ship feedback when building save data', () => {
+    const state = createGameState(320, 240, 'CINDER-5D');
+    state.ship.recoilUntil = 999;
+
+    const slot = buildSaveSlotData(state, 1);
+
+    expect(slot.ship.recoilUntil).toBe(0);
   });
 
   it('falls back to an empty bundle for invalid storage', () => {

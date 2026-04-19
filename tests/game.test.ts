@@ -116,6 +116,46 @@ describe('game logic', () => {
     expect(shouldAutoShoot(combatState)).toBe(true);
   });
 
+  it('adds a slight spread to fired projectiles', () => {
+    const state = createGameState(320, 240, 'CINDER-5D');
+    state.ship.x = 160;
+    state.ship.y = 120;
+    state.ship.vx = 0;
+    state.ship.vy = 0;
+    state.ship.angle = 0;
+
+    const input = createInputState();
+    input.shootRequested = true;
+
+    updateGame(state, input, 0, 1000);
+
+    expect(state.bullets).toHaveLength(1);
+    const bullet = state.bullets[0]!;
+    expect(Math.atan2(bullet.vy, bullet.vx)).toBeCloseTo(-0.0142, 3);
+  });
+
+  it('adds recoil and transient feedback when firing', () => {
+    const state = createGameState(320, 240, 'CINDER-5D');
+    state.ship.x = 160;
+    state.ship.y = 120;
+    state.ship.vx = 0;
+    state.ship.vy = 0;
+    state.ship.angle = 0;
+
+    const input = createInputState();
+    input.shootRequested = true;
+
+    updateGame(state, input, 0, 1000);
+
+    expect(state.ship.vx).toBeCloseTo(-18);
+    expect(state.ship.recoilUntil).toBe(1070);
+    expect(state.bullets).toHaveLength(1);
+    expect(state.bullets[0]?.trailUntil).toBe(1090);
+    expect(state.particles.length).toBeGreaterThan(0);
+    expect(state.flashes.length).toBeGreaterThan(0);
+    expect(state.shake.amplitude).toBe(1.5);
+  });
+
   it('keeps sector asteroid total hp fixed for the whole cell while current hp decreases', () => {
     const state = createGameState(320, 240, 'CINDER-5D');
     state.cells[cellKey(state.currentCell)] = {
@@ -483,6 +523,106 @@ describe('game logic', () => {
     expect(state.player.xp).toBe(4);
     expect(state.asteroids).toHaveLength(3);
     expect(state.asteroids.every((asteroid) => asteroid.size === 2)).toBe(true);
+  });
+
+  it('adds hit feedback when a bullet damages but does not destroy an asteroid', () => {
+    const state = createGameState(320, 240, 'CINDER-5D');
+    state.ship.alive = false;
+    state.asteroids = [
+      {
+        x: 120,
+        y: 120,
+        vx: 0,
+        vy: 0,
+        size: 3,
+        radius: 56,
+        hp: 12,
+        maxHp: 12,
+        xpReward: 4,
+        contactDamage: 3,
+        hpVisible: false,
+      },
+    ];
+    state.bullets = [
+      {
+        x: 120,
+        y: 120,
+        vx: 9,
+        vy: 0,
+        life: 1,
+        damage: 1,
+      },
+    ];
+
+    updateGame(state, createInputState(), 0, 1000);
+
+    expect(state.asteroids).toHaveLength(1);
+    expect(state.asteroids[0]?.hp).toBe(11);
+    expect(state.asteroids[0]?.hitFlashUntil).toBe(1080);
+    expect(state.asteroids[0]?.hitScaleUntil).toBe(1090);
+    expect(state.particles.length).toBeGreaterThan(0);
+    expect(state.flashes.length).toBeGreaterThan(0);
+    expect(state.shake.amplitude).toBeGreaterThan(0);
+  });
+
+  it('adds burst feedback when a bullet destroys an asteroid', () => {
+    const state = createGameState(320, 240, 'CINDER-5D');
+    state.ship.alive = false;
+    state.player.xp = 0;
+    state.asteroids = [
+      {
+        x: 120,
+        y: 120,
+        vx: 0,
+        vy: 0,
+        size: 3,
+        radius: 56,
+        hp: 1,
+        maxHp: 1,
+        xpReward: 4,
+        contactDamage: 3,
+        hpVisible: false,
+      },
+    ];
+    state.bullets = [
+      {
+        x: 120,
+        y: 120,
+        vx: 0,
+        vy: 0,
+        life: 1,
+        damage: 10,
+      },
+    ];
+
+    updateGame(state, createInputState(), 0, 1000);
+
+    expect(state.player.xp).toBe(4);
+    expect(state.asteroids).toHaveLength(3);
+    expect(state.particles.length).toBeGreaterThan(10);
+    expect(state.flashes.length).toBeGreaterThan(0);
+    expect(state.shake.amplitude).toBeGreaterThanOrEqual(4);
+  });
+
+  it('expires transient particles over time', () => {
+    const state = createGameState(320, 240, 'CINDER-5D');
+    state.ship.alive = false;
+    state.particles = [
+      {
+        x: 10,
+        y: 10,
+        vx: 0,
+        vy: 0,
+        life: 0.01,
+        maxLife: 0.01,
+        size: 2,
+        kind: 'spark',
+      },
+    ];
+
+    updateGame(state, createInputState(), 0.02, 1000);
+
+    expect(state.particles).toHaveLength(0);
   });
 
   it('clears a cell, grants the clear reward, and levels up through xp', () => {
@@ -867,6 +1007,7 @@ describe('game logic', () => {
         angle: 0,
         invulnerableUntil: 999999,
         alive: true,
+        recoilUntil: 999999,
       },
       player: {
         level: 1,
@@ -900,5 +1041,6 @@ describe('game logic', () => {
     expect(state.ship.y).toBeCloseTo(239);
     expect(state.nextShotAt).toBe(0);
     expect(state.transitionCooldownUntil).toBeGreaterThan(0);
+    expect(state.ship.recoilUntil).toBe(0);
   });
 });

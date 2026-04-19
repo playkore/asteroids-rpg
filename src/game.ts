@@ -14,6 +14,31 @@ export type CellCoord = {
 
 export type AsteroidSize = 3 | 2 | 1;
 
+export type ParticleKind = 'spark' | 'debris' | 'muzzle' | 'burst';
+
+export type Particle = {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  life: number;
+  maxLife: number;
+  size: number;
+  kind: ParticleKind;
+};
+
+export type ScreenShake = {
+  amplitude: number;
+  until: number;
+};
+
+export type FlashEffect = {
+  x: number;
+  y: number;
+  radius: number;
+  until: number;
+};
+
 export type RemainingAsteroids = Record<AsteroidSize, number>;
 
 export type CellKind = 'empty' | 'combat';
@@ -33,6 +58,7 @@ export type Ship = {
   angle: number;
   invulnerableUntil: number;
   alive: boolean;
+  recoilUntil?: number;
 };
 
 export type Bullet = {
@@ -42,6 +68,7 @@ export type Bullet = {
   vy: number;
   life: number;
   damage: number;
+  trailUntil?: number;
 };
 
 export type Asteroid = {
@@ -56,6 +83,8 @@ export type Asteroid = {
   xpReward: number;
   contactDamage: number;
   hpVisible: boolean;
+  hitFlashUntil?: number;
+  hitScaleUntil?: number;
 };
 
 export type GameState = {
@@ -67,6 +96,9 @@ export type GameState = {
   ship: Ship;
   bullets: Bullet[];
   asteroids: Asteroid[];
+  particles: Particle[];
+  flashes: FlashEffect[];
+  shake: ScreenShake;
   player: PlayerStats;
   gameOver: boolean;
   respawnBlinkUntil: number;
@@ -149,8 +181,13 @@ const SHIP_JOYSTICK_RESPONSE = 0.2;
 const SHIP_KEYBOARD_ROTATION_SPEED = 4.2;
 const SHIP_KEYBOARD_THRUST = 240;
 const BULLET_SPEED = 560;
+const BULLET_SPREAD = 0.04;
 const BULLET_LIFE = 1.05;
 const SHOOT_COOLDOWN = 0.18;
+const MUZZLE_FLASH_TIME = 0.05;
+const HIT_FLASH_TIME = 0.08;
+const HIT_SCALE_TIME = 0.09;
+const FLAME_THRUST_TIME = 0.09;
 const DAMAGE_INVULNERABILITY_TIME = 1.4;
 const TRANSITION_INVULNERABILITY_TIME = 0.25;
 const CELL_CLEAR_XP = 3;
@@ -228,10 +265,17 @@ export function createGameState(
       angle: -Math.PI / 2,
       invulnerableUntil: 0,
       alive: true,
+      recoilUntil: 0,
       ...options.ship,
     },
     bullets: cloneBullets(options.bullets ?? []),
     asteroids: cloneAsteroids(options.asteroids ?? []),
+    particles: [],
+    flashes: [],
+    shake: {
+      amplitude: 0,
+      until: 0,
+    },
     player: options.player ? { ...options.player } : createPlayerStats(),
     gameOver: options.gameOver ?? false,
     respawnBlinkUntil: 0,
@@ -267,6 +311,7 @@ export function hydrateGameState(
     ship: {
       ...snapshot.ship,
       invulnerableUntil: 0,
+      recoilUntil: 0,
     },
     gameOver: false,
     nextShotAt: 0,
@@ -348,9 +393,11 @@ export function updateGame(
 
   updateBullets(state, dt);
   updateAsteroids(state, dt);
-  resolveBulletHits(state);
+  updateParticles(state, dt);
+  resolveBulletHits(state, now);
   handleClearCell(state);
   updatePassiveRegen(state, dt);
+  updateTransientFeedback(state, now);
 
   if (state.ship.alive && now >= state.transitionCooldownUntil) {
     handleCellTransitions(state, now);
@@ -517,17 +564,29 @@ function tryShoot(state: GameState, now: number) {
   }
 
   const muzzleDistance = 16;
+  const random = createSeededRandom(
+    `${normalizeSeed(state.seed)}|shot:${normalizeCellX(state.currentCell.x)}:${state.currentCell.y}:${state.nextShotAt}:${now}`,
+  );
+  const spread = (random() - 0.5) * BULLET_SPREAD;
+  const angle = state.ship.angle + spread;
   const bullet: Bullet = {
-    x: state.ship.x + Math.cos(state.ship.angle) * muzzleDistance,
-    y: state.ship.y + Math.sin(state.ship.angle) * muzzleDistance,
-    vx: Math.cos(state.ship.angle) * BULLET_SPEED + state.ship.vx,
-    vy: Math.sin(state.ship.angle) * BULLET_SPEED + state.ship.vy,
+    x: state.ship.x + Math.cos(angle) * muzzleDistance,
+    y: state.ship.y + Math.sin(angle) * muzzleDistance,
+    vx: Math.cos(angle) * BULLET_SPEED + state.ship.vx,
+    vy: Math.sin(angle) * BULLET_SPEED + state.ship.vy,
     life: BULLET_LIFE,
     damage: state.player.attack,
+    trailUntil: now + FLAME_THRUST_TIME * 1000,
   };
 
   state.bullets.push(bullet);
   state.nextShotAt = now + SHOOT_COOLDOWN * 1000;
+  state.ship.vx -= Math.cos(state.ship.angle) * 18;
+  state.ship.vy -= Math.sin(state.ship.angle) * 18;
+  state.ship.recoilUntil = now + 70;
+  spawnMuzzleParticles(state, bullet.x, bullet.y, angle, now);
+  spawnFlash(state, bullet.x, bullet.y, 12, now + MUZZLE_FLASH_TIME * 1000);
+  addScreenShake(state, 1.5, now + 60);
 }
 
 function updateBullets(state: GameState, dt: number) {
@@ -564,7 +623,25 @@ function updateAsteroids(state: GameState, dt: number) {
   }
 }
 
-function resolveBulletHits(state: GameState) {
+function updateParticles(state: GameState, dt: number) {
+  const nextParticles: Particle[] = [];
+
+  for (const particle of state.particles) {
+    particle.x += particle.vx * dt;
+    particle.y += particle.vy * dt;
+    particle.life -= dt;
+    particle.vx *= 0.96;
+    particle.vy *= 0.96;
+
+    if (particle.life > 0) {
+      nextParticles.push(particle);
+    }
+  }
+
+  state.particles = nextParticles;
+}
+
+function resolveBulletHits(state: GameState, now: number) {
   const survivors: Bullet[] = [];
   const nextAsteroids: Asteroid[] = [];
   const spawnedAsteroids: Asteroid[] = [];
@@ -594,6 +671,11 @@ function resolveBulletHits(state: GameState) {
     asteroid.vy += bullet.vy / asteroidMass;
     asteroid.hp = Math.max(0, asteroid.hp - bullet.damage);
     asteroid.hpVisible = true;
+    asteroid.hitFlashUntil = now + HIT_FLASH_TIME * 1000;
+    asteroid.hitScaleUntil = now + HIT_SCALE_TIME * 1000;
+    spawnHitParticles(state, bullet.x, bullet.y, asteroid.size === 3 ? 5 : 4, now);
+    spawnFlash(state, bullet.x, bullet.y, asteroid.radius * 0.45, now + 60);
+    addScreenShake(state, asteroid.size === 3 ? 2.5 : 1.5, now + 70);
 
     if (asteroid.hp > 0) {
       continue;
@@ -601,6 +683,9 @@ function resolveBulletHits(state: GameState) {
 
     nextAsteroids.splice(hitIndex, 1);
     gainPlayerXp(state.player, asteroid.xpReward);
+    spawnBurst(state, asteroid.x, asteroid.y, asteroid.size, now);
+    spawnFlash(state, asteroid.x, asteroid.y, asteroid.radius, now + 100);
+    addScreenShake(state, asteroid.size === 3 ? 4 : asteroid.size === 2 ? 2.5 : 1.5, now + 100);
 
     if (asteroid.size > 1) {
       spawnedAsteroids.push(...spawnChildAsteroids(state, asteroid));
@@ -696,11 +781,18 @@ function damagePlayer(state: GameState, amount: number, now: number) {
   state.player.hp = Math.max(0, state.player.hp - amount);
 
   if (state.player.hp <= 0) {
+    spawnBurst(state, state.ship.x, state.ship.y, 3, now);
+    spawnFlash(state, state.ship.x, state.ship.y, 18, now + 100);
+    addScreenShake(state, 4, now + 120);
     respawnPlayer(state, now);
     return true;
   }
 
   state.ship.invulnerableUntil = now + DAMAGE_INVULNERABILITY_TIME * 1000;
+  state.ship.recoilUntil = now + 100;
+  spawnHitParticles(state, state.ship.x, state.ship.y, 7, now);
+  spawnFlash(state, state.ship.x, state.ship.y, 18, now + 80);
+  addScreenShake(state, 3, now + 120);
   return false;
 }
 
@@ -733,6 +825,7 @@ function respawnPlayer(state: GameState, now: number) {
   state.ship.vx = 0;
   state.ship.vy = 0;
   state.ship.alive = true;
+  state.ship.recoilUntil = 0;
   state.ship.invulnerableUntil = now + RESPAWN_BLINK_TIME * 1000;
   state.respawnBlinkUntil = state.ship.invulnerableUntil;
   state.player.hp = state.player.maxHp;
@@ -886,6 +979,8 @@ function createAsteroid(
     xpReward: ASTEROID_XP_REWARD[size],
     contactDamage: getAsteroidContactDamage(level, size),
     hpVisible: false,
+    hitFlashUntil: 0,
+    hitScaleUntil: 0,
   };
 }
 
@@ -901,9 +996,10 @@ function spawnChildAsteroids(state: GameState, asteroid: Asteroid) {
     const angle = random() * Math.PI * 2;
     const speed = ASTEROID_SPEED[childSize] * (0.85 + random() * 0.3);
     const childHp = getAsteroidHp(getCellLevel(state.currentCell), childSize);
+    const offset = asteroid.radius * 0.18;
     children.push({
-      x: asteroid.x,
-      y: asteroid.y,
+      x: asteroid.x + Math.cos(angle) * offset,
+      y: asteroid.y + Math.sin(angle) * offset,
       vx: Math.cos(angle) * speed + asteroid.vx * 0.25,
       vy: Math.sin(angle) * speed + asteroid.vy * 0.25,
       size: childSize,
@@ -913,6 +1009,8 @@ function spawnChildAsteroids(state: GameState, asteroid: Asteroid) {
       xpReward: ASTEROID_XP_REWARD[childSize],
       contactDamage: getAsteroidContactDamage(getCellLevel(state.currentCell), childSize),
       hpVisible: false,
+      hitFlashUntil: 0,
+      hitScaleUntil: 0,
     });
   }
 
@@ -972,11 +1070,111 @@ function cloneCellStateMap(cells: Record<string, CellState>) {
 }
 
 function cloneBullets(bullets: Bullet[]) {
-  return bullets.map((bullet) => ({ ...bullet }));
+  return bullets.map((bullet) => ({
+    trailUntil: 0,
+    ...bullet,
+  }));
 }
 
 function cloneAsteroids(asteroids: Asteroid[]) {
-  return asteroids.map((asteroid) => ({ ...asteroid }));
+  return asteroids.map((asteroid) => ({
+    hitFlashUntil: 0,
+    hitScaleUntil: 0,
+    ...asteroid,
+  }));
+}
+
+function spawnParticle(state: GameState, particle: Particle) {
+  state.particles.push(particle);
+}
+
+function createEventRandom(state: GameState, label: string, now: number, x: number, y: number) {
+  return createSeededRandom(
+    `${normalizeSeed(state.seed)}|fx:${label}:${normalizeCellX(state.currentCell.x)}:${state.currentCell.y}:${state.spawnCounter}:${Math.round(now)}:${Math.round(x)}:${Math.round(y)}`,
+  );
+}
+
+function spawnMuzzleParticles(state: GameState, x: number, y: number, angle: number, now: number) {
+  const random = createEventRandom(state, 'muzzle', now, x, y);
+
+  for (let index = 0; index < 3; index += 1) {
+    const speed = 55 + index * 22;
+    const spread = (random() - 0.5) * 26;
+    const life = 0.08 + index * 0.01;
+    spawnParticle(state, {
+      x,
+      y,
+      vx: Math.cos(angle) * speed + spread,
+      vy: Math.sin(angle) * speed + spread * 0.35,
+      life,
+      maxLife: life,
+      size: 2 + index * 0.4,
+      kind: 'muzzle',
+    });
+  }
+}
+
+function spawnHitParticles(state: GameState, x: number, y: number, count: number, now: number) {
+  const random = createEventRandom(state, 'hit', now, x, y);
+
+  for (let index = 0; index < count; index += 1) {
+    const angle = random() * Math.PI * 2;
+    const speed = 60 + random() * 160;
+    const life = 0.22 + random() * 0.12;
+    spawnParticle(state, {
+      x,
+      y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      life,
+      maxLife: 0.34,
+      size: 2 + random() * 2,
+      kind: index % 2 === 0 ? 'spark' : 'debris',
+    });
+  }
+}
+
+function spawnBurst(state: GameState, x: number, y: number, size: AsteroidSize, now: number) {
+  const count = size === 3 ? 12 : size === 2 ? 8 : 5;
+  const random = createEventRandom(state, 'burst', now, x, y);
+
+  for (let index = 0; index < count; index += 1) {
+    const angle = random() * Math.PI * 2;
+    const speed = 50 + random() * 110;
+    const life = 0.16 + random() * 0.16;
+    spawnParticle(state, {
+      x,
+      y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      life,
+      maxLife: 0.32,
+      size: 2 + random() * 2,
+      kind: index % 3 === 0 ? 'burst' : 'debris',
+    });
+  }
+}
+
+function spawnFlash(state: GameState, x: number, y: number, radius: number, until: number) {
+  state.flashes.push({
+    x,
+    y,
+    radius,
+    until,
+  });
+}
+
+function addScreenShake(state: GameState, amplitude: number, until: number) {
+  state.shake.amplitude = Math.max(state.shake.amplitude, amplitude);
+  state.shake.until = Math.max(state.shake.until, until);
+}
+
+function updateTransientFeedback(state: GameState, now: number) {
+  state.flashes = state.flashes.filter((flash) => now < flash.until);
+  if (now >= state.shake.until) {
+    state.shake.amplitude = 0;
+    state.shake.until = 0;
+  }
 }
 
 function distanceSquared(ax: number, ay: number, bx: number, by: number) {
