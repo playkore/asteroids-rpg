@@ -474,7 +474,7 @@ export function generateCellRecord(seed: string, cell: CellCoord): CellState {
   const random = createSeededRandom(
     `${normalizeSeed(seed)}|cell:${normalizedCell.x}:${normalizedCell.y}`,
   );
-  const combat = random() < 0.25;
+  const combat = random() < 0.5;
   return {
     kind: combat ? 'combat' : 'empty',
     visited: false,

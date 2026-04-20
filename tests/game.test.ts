@@ -79,7 +79,7 @@ describe('game logic', () => {
     });
   });
 
-  it('generates combat cells on 254 of the first 1000 levels for x=0', () => {
+  it('generates combat cells at roughly a 50% rate for x=0', () => {
     let combatCount = 0;
 
     for (let y = 0; y < 1000; y += 1) {
@@ -88,7 +88,8 @@ describe('game logic', () => {
       }
     }
 
-    expect(combatCount).toBe(254);
+    expect(combatCount).toBeGreaterThanOrEqual(450);
+    expect(combatCount).toBeLessThanOrEqual(550);
   });
 
   it('only auto shoots when there are asteroids in the field', () => {
@@ -118,6 +119,7 @@ describe('game logic', () => {
 
   it('adds a slight spread to fired projectiles', () => {
     const state = createGameState(320, 240, 'CINDER-5D');
+    state.asteroids = [];
     state.ship.x = 160;
     state.ship.y = 120;
     state.ship.vx = 0;
@@ -136,6 +138,7 @@ describe('game logic', () => {
 
   it('adds recoil and transient feedback when firing', () => {
     const state = createGameState(320, 240, 'CINDER-5D');
+    state.asteroids = [];
     state.ship.x = 160;
     state.ship.y = 120;
     state.ship.vx = 0;
