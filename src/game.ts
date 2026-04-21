@@ -183,7 +183,7 @@ const SHIP_KEYBOARD_THRUST = 240;
 const BULLET_SPEED = 560;
 const BULLET_SPREAD = 0.04;
 const BULLET_LIFE = 1.05;
-const SHOOT_COOLDOWN = 0.18;
+const SHOT_DAMAGE = 2;
 const MUZZLE_FLASH_TIME = 0.05;
 const HIT_FLASH_TIME = 0.08;
 const HIT_SCALE_TIME = 0.09;
@@ -575,12 +575,12 @@ function tryShoot(state: GameState, now: number) {
     vx: Math.cos(angle) * BULLET_SPEED + state.ship.vx,
     vy: Math.sin(angle) * BULLET_SPEED + state.ship.vy,
     life: BULLET_LIFE,
-    damage: state.player.attack,
+    damage: SHOT_DAMAGE,
     trailUntil: now + FLAME_THRUST_TIME * 1000,
   };
 
   state.bullets.push(bullet);
-  state.nextShotAt = now + SHOOT_COOLDOWN * 1000;
+  state.nextShotAt = now + 1000 / Math.max(1, state.player.level);
   state.ship.vx -= Math.cos(state.ship.angle) * 18;
   state.ship.vy -= Math.sin(state.ship.angle) * 18;
   state.ship.recoilUntil = now + 70;

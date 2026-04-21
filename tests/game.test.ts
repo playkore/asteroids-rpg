@@ -154,9 +154,40 @@ describe('game logic', () => {
     expect(state.ship.recoilUntil).toBe(1070);
     expect(state.bullets).toHaveLength(1);
     expect(state.bullets[0]?.trailUntil).toBe(1090);
+    expect(state.nextShotAt).toBe(2000);
     expect(state.particles.length).toBeGreaterThan(0);
     expect(state.flashes.length).toBeGreaterThan(0);
     expect(state.shake.amplitude).toBe(1.5);
+  });
+
+  it('scales firing rate with level while keeping bullet damage fixed', () => {
+    const state = createGameState(320, 240, 'CINDER-5D');
+    state.asteroids = [];
+    state.player.level = 2;
+    state.player.attack = 3;
+    state.ship.x = 160;
+    state.ship.y = 120;
+    state.ship.vx = 0;
+    state.ship.vy = 0;
+    state.ship.angle = 0;
+
+    const input = createInputState();
+    input.shootHeld = true;
+
+    updateGame(state, input, 0, 1000);
+
+    expect(state.bullets).toHaveLength(1);
+    expect(state.bullets[0]?.damage).toBe(2);
+    expect(state.nextShotAt).toBe(1500);
+
+    updateGame(state, input, 0, 1499);
+
+    expect(state.bullets).toHaveLength(1);
+
+    updateGame(state, input, 0, 1500);
+
+    expect(state.bullets).toHaveLength(2);
+    expect(state.bullets[1]?.damage).toBe(2);
   });
 
   it('keeps sector asteroid total hp fixed for the whole cell while current hp decreases', () => {
