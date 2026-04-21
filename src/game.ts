@@ -13,6 +13,7 @@ export type CellCoord = {
 };
 
 export type AsteroidSize = 3 | 2 | 1;
+export type AsteroidRole = 'normal' | 'fast' | 'splitter';
 
 export type ParticleKind = 'spark' | 'debris' | 'muzzle' | 'burst';
 
@@ -77,6 +78,7 @@ export type Asteroid = {
   vx: number;
   vy: number;
   size: AsteroidSize;
+  role?: AsteroidRole;
   radius: number;
   hp: number;
   maxHp: number;
@@ -197,6 +199,55 @@ const PASSIVE_REGEN_AMOUNT = 1;
 const WORLD_WIDTH = 7;
 const WORLD_MIN_Y = -4;
 const RESPAWN_BLINK_TIME = 3.5;
+const ASTEROID_BUDGET_BASE = 4;
+const ASTEROID_BUDGET_SCALE = 2;
+const ASTEROID_COST: Record<AsteroidSize, number> = {
+  3: 4,
+  2: 2,
+  1: 1,
+};
+const ASTEROID_SIZE_WEIGHTS = {
+  early: {
+    3: 0.6,
+    2: 0.4,
+    1: 0,
+  },
+  mid: {
+    3: 0.4,
+    2: 0.5,
+    1: 0.1,
+  },
+  late: {
+    3: 0.25,
+    2: 0.5,
+    1: 0.25,
+  },
+} as const;
+const ASTEROID_ROLE_WEIGHTS = {
+  early: {
+    normal: 1,
+  },
+  mid: {
+    normal: 0.7,
+    fast: 0.3,
+  },
+  late: {
+    normal: 0.5,
+    fast: 0.25,
+    splitter: 0.25,
+  },
+  endgame: {
+    normal: 0.4,
+    fast: 0.3,
+    splitter: 0.3,
+  },
+} as const;
+const ASTEROID_MAX_ENTITIES = {
+  early: 6,
+  mid: 8,
+  late: 12,
+  endgame: 16,
+} as const;
 
 const ASTEROID_RADIUS: Record<AsteroidSize, number> = {
   3: 56,
@@ -204,7 +255,7 @@ const ASTEROID_RADIUS: Record<AsteroidSize, number> = {
   1: 20,
 };
 
-const ASTEROID_SPEED: Record<AsteroidSize, number> = {
+const ASTEROID_BASE_SPEED: Record<AsteroidSize, number> = {
   3: 56,
   2: 112,
   1: 224,
@@ -214,6 +265,12 @@ const ASTEROID_XP_REWARD: Record<AsteroidSize, number> = {
   3: 4,
   2: 2,
   1: 1,
+};
+
+const ASTEROID_HP: Record<AsteroidSize, number> = {
+  3: 12,
+  2: 6,
+  1: 3,
 };
 
 const SHIP_MASS = 1;
@@ -427,12 +484,7 @@ export function buildMapState(state: GameState): MapState {
 }
 
 export function buildHudState(state: GameState, ready: boolean): HudState {
-  const currentCell = state.cells[cellKey(state.currentCell)];
-  const sectorHp = summarizeSectorAsteroidHp(
-    state.asteroids,
-    getCellLevel(state.currentCell),
-    currentCell?.remaining,
-  );
+  const sectorHp = summarizeSectorAsteroidHp(state.asteroids, getCellLevel(state.currentCell));
   return {
     player: state.player,
     seed: state.seed,
@@ -471,6 +523,7 @@ export function generateCellRecord(seed: string, cell: CellCoord): CellState {
     };
   }
 
+  const level = getCellLevel(normalizedCell);
   const random = createSeededRandom(
     `${normalizeSeed(seed)}|cell:${normalizedCell.x}:${normalizedCell.y}`,
   );
@@ -479,22 +532,155 @@ export function generateCellRecord(seed: string, cell: CellCoord): CellState {
     kind: combat ? 'combat' : 'empty',
     visited: false,
     cleared: false,
-    remaining: combat
-      ? {
-          3: 3,
-          2: 0,
-          1: 0,
-        }
-      : {
-          3: 0,
-          2: 0,
-          1: 0,
-        },
+    remaining: combat ? generateInitialAsteroidCounts(level, random, maxEntitiesOnScreen(level)) : emptyRemainingAsteroids(),
   };
 }
 
 export function totalAsteroids(remaining: RemainingAsteroids) {
   return remaining[3] + remaining[2] + remaining[1];
+}
+
+function emptyRemainingAsteroids(): RemainingAsteroids {
+  return {
+    3: 0,
+    2: 0,
+    1: 0,
+  };
+}
+
+function summarizeAsteroidCounts(asteroids: Asteroid[]) {
+  const remaining = emptyRemainingAsteroids();
+  for (const asteroid of asteroids) {
+    remaining[asteroid.size] += 1;
+  }
+  return remaining;
+}
+
+function generateInitialAsteroidCounts(level: number, random: () => number, maxEntities: number) {
+  const remainingBudget = computeBudget(level);
+  const weights = getAsteroidSizeWeights(level);
+  const counts = emptyRemainingAsteroids();
+  const limit = Math.max(0, maxEntities);
+  let remaining = remainingBudget;
+  let spawned = 0;
+
+  while (remaining > 0 && spawned < limit) {
+    const size = pickWeightedSize(random, weights, remaining);
+    if (!size) {
+      break;
+    }
+
+    const cost = getAsteroidCost(size);
+    if (cost > remaining) {
+      const fallback = getNextAffordableSize(size, remaining);
+      if (!fallback) {
+        break;
+      }
+
+      counts[fallback] += 1;
+      remaining -= getAsteroidCost(fallback);
+      spawned += 1;
+      continue;
+    }
+
+    counts[size] += 1;
+    remaining -= cost;
+    spawned += 1;
+  }
+
+  return counts;
+}
+
+function pickWeightedSize(
+  random: () => number,
+  weights: Record<AsteroidSize, number>,
+  remainingBudget: number,
+): AsteroidSize | null {
+  const candidates: Array<{ size: AsteroidSize; weight: number }> = [];
+  for (const size of [3, 2, 1] as const) {
+    if (getAsteroidCost(size) <= remainingBudget && weights[size] > 0) {
+      candidates.push({ size, weight: weights[size] });
+    }
+  }
+
+  if (candidates.length === 0) {
+    return null;
+  }
+
+  const totalWeight = candidates.reduce((sum, candidate) => sum + candidate.weight, 0);
+  let roll = random() * totalWeight;
+  for (const candidate of candidates) {
+    roll -= candidate.weight;
+    if (roll <= 0) {
+      return candidate.size;
+    }
+  }
+
+  return candidates[candidates.length - 1]!.size;
+}
+
+function getNextAffordableSize(preferred: AsteroidSize, remainingBudget: number) {
+  const order: AsteroidSize[] = preferred === 3 ? [2, 1] : preferred === 2 ? [1] : [];
+  for (const size of order) {
+    if (getAsteroidCost(size) <= remainingBudget) {
+      return size;
+    }
+  }
+  return null;
+}
+
+export function computeBudget(level: number) {
+  return ASTEROID_BUDGET_BASE + Math.max(1, level) * ASTEROID_BUDGET_SCALE;
+}
+
+export function getAsteroidCost(size: AsteroidSize) {
+  return ASTEROID_COST[size];
+}
+
+export function getAsteroidSizeWeights(level: number) {
+  if (level <= 2) {
+    return ASTEROID_SIZE_WEIGHTS.early;
+  }
+  if (level <= 5) {
+    return ASTEROID_SIZE_WEIGHTS.mid;
+  }
+  return ASTEROID_SIZE_WEIGHTS.late;
+}
+
+export function getAsteroidRoleWeights(level: number) {
+  if (level <= 2) {
+    return ASTEROID_ROLE_WEIGHTS.early;
+  }
+  if (level <= 4) {
+    return ASTEROID_ROLE_WEIGHTS.mid;
+  }
+  if (level <= 7) {
+    return ASTEROID_ROLE_WEIGHTS.late;
+  }
+  return ASTEROID_ROLE_WEIGHTS.endgame;
+}
+
+export function maxEntitiesOnScreen(level: number) {
+  if (level <= 2) {
+    return ASTEROID_MAX_ENTITIES.early;
+  }
+  if (level <= 5) {
+    return ASTEROID_MAX_ENTITIES.mid;
+  }
+  if (level <= 8) {
+    return ASTEROID_MAX_ENTITIES.late;
+  }
+  return ASTEROID_MAX_ENTITIES.endgame;
+}
+
+export function getAsteroidSizeBand(level: number) {
+  if (level <= 2) {
+    return 'early' as const;
+  }
+  if (level <= 5) {
+    return 'mid' as const;
+  }
+  return 'late' as const;
 }
 
 export type SectorAsteroidHpSummary = {
@@ -506,38 +692,15 @@ export type SectorAsteroidHpSummary = {
 export function summarizeSectorAsteroidHp(
   asteroids: Asteroid[],
   level: number,
-  remaining?: RemainingAsteroids,
 ): SectorAsteroidHpSummary {
-  let currentHp = 0;
-
-  for (const asteroid of asteroids) {
-    currentHp += asteroid.hp + descendantAsteroidHp(level, asteroid.size);
-  }
-
-  const totalHp = remaining
-    ? totalAsteroidTreeHp(level, remaining)
-    : asteroids.reduce(
-        (sum, asteroid) => sum + asteroid.maxHp + descendantAsteroidHp(level, asteroid.size),
-        0,
-      );
+  const currentHp = asteroids.reduce((sum, asteroid) => sum + asteroid.hp, 0);
+  const totalHp = asteroids.reduce((sum, asteroid) => sum + asteroid.maxHp + descendantAsteroidHp(level, asteroid), 0);
 
   return {
     currentHp,
     totalHp,
     hasAsteroids: asteroids.length > 0,
   };
-}
-
-function totalAsteroidTreeHp(level: number, remaining: RemainingAsteroids) {
-  return (
-    remaining[3] * getAsteroidTreeHp(level, 3) +
-    remaining[2] * getAsteroidTreeHp(level, 2) +
-    remaining[1] * getAsteroidTreeHp(level, 1)
-  );
-}
-
-function getAsteroidTreeHp(level: number, size: AsteroidSize) {
-  return getAsteroidHp(level, size) + descendantAsteroidHp(level, size);
 }
 
 export function prepareGameStateForSave(state: GameState) {
@@ -645,6 +808,7 @@ function resolveBulletHits(state: GameState, now: number) {
   const survivors: Bullet[] = [];
   const nextAsteroids: Asteroid[] = [];
   const spawnedAsteroids: Asteroid[] = [];
+  const limit = maxEntitiesOnScreen(getCellLevel(state.currentCell));
 
   for (const asteroid of state.asteroids) {
     nextAsteroids.push(asteroid);
@@ -688,7 +852,8 @@ function resolveBulletHits(state: GameState, now: number) {
     addScreenShake(state, asteroid.size === 3 ? 4 : asteroid.size === 2 ? 2.5 : 1.5, now + 100);
 
     if (asteroid.size > 1) {
-      spawnedAsteroids.push(...spawnChildAsteroids(state, asteroid));
+      const availableSlots = limit - (nextAsteroids.length + spawnedAsteroids.length);
+      spawnedAsteroids.push(...spawnChildAsteroids(state, asteroid, availableSlots));
     }
   }
 
@@ -854,11 +1019,7 @@ function saveCurrentCellProgress(state: GameState) {
     return;
   }
 
-  cell.remaining = {
-    3: 3,
-    2: 0,
-    1: 0,
-  };
+  cell.remaining = summarizeAsteroidCounts(state.asteroids);
   cell.cleared = false;
 }
 
@@ -934,9 +1095,13 @@ function spawnAsteroidsForCell(context: CellSpawnContext, remaining: RemainingAs
   const random = createSeededRandom(
     `${normalizeSeed(context.seed)}|spawn:${normalizeCellX(context.cell.x)}:${context.cell.y}:${context.spawnCounter}:${context.level}`,
   );
+  const limit = maxEntitiesOnScreen(context.level);
 
   const spawnCount = (size: AsteroidSize, count: number) => {
     for (let index = 0; index < count; index += 1) {
+      if (asteroids.length >= limit) {
+        return;
+      }
       const asteroid = createAsteroid(
         context.level,
         size,
@@ -962,10 +1127,9 @@ function createAsteroid(
   height: number,
 ): Asteroid {
   const angle = random() * Math.PI * 2;
-  const sizeBias = size === 3 ? 1 : size === 2 ? 1.15 : 1.3;
-  const levelBias = 1 + Math.min(level, 12) * 0.04;
-  const speed = ASTEROID_SPEED[size] * sizeBias * levelBias;
-  const hp = getAsteroidHp(level, size);
+  const role = pickAsteroidRole(level, random);
+  const speed = getAsteroidSpeed(size, role, random);
+  const hp = getAsteroidHp(size, role);
 
   return {
     x: width / 2,
@@ -973,6 +1137,7 @@ function createAsteroid(
     vx: Math.cos(angle + Math.PI / 2) * speed,
     vy: Math.sin(angle + Math.PI / 2) * speed,
     size,
+    role,
     radius: ASTEROID_RADIUS[size],
     hp,
     maxHp: hp,
@@ -984,18 +1149,22 @@ function createAsteroid(
   };
 }
 
-function spawnChildAsteroids(state: GameState, asteroid: Asteroid) {
+function spawnChildAsteroids(state: GameState, asteroid: Asteroid, availableSlots: number) {
   const childSize = (asteroid.size - 1) as AsteroidSize;
   const random = createSeededRandom(
-    `${normalizeSeed(state.seed)}|child:${normalizeCellX(state.currentCell.x)}:${state.currentCell.y}:${state.spawnCounter}:${asteroid.size}:${asteroid.hp}`,
+    `${normalizeSeed(state.seed)}|child:${normalizeCellX(state.currentCell.x)}:${state.currentCell.y}:${state.spawnCounter}:${asteroid.size}:${asteroid.role ?? 'normal'}:${asteroid.hp}`,
   );
   state.spawnCounter += 1;
   const children: Asteroid[] = [];
+  const level = getCellLevel(state.currentCell);
+  const requested = computeSplitCount(level, asteroid, random);
+  const count = Math.min(requested, Math.max(0, availableSlots));
 
-  for (let index = 0; index < 3; index += 1) {
+  for (let index = 0; index < count; index += 1) {
     const angle = random() * Math.PI * 2;
-    const speed = ASTEROID_SPEED[childSize] * (0.85 + random() * 0.3);
-    const childHp = getAsteroidHp(getCellLevel(state.currentCell), childSize);
+    const childRole = pickAsteroidRole(level, random);
+    const speed = getAsteroidSpeed(childSize, childRole, random);
+    const childHp = getAsteroidHp(childSize, childRole);
     const offset = asteroid.radius * 0.18;
     children.push({
       x: asteroid.x + Math.cos(angle) * offset,
@@ -1003,11 +1172,12 @@ function spawnChildAsteroids(state: GameState, asteroid: Asteroid) {
       vx: Math.cos(angle) * speed + asteroid.vx * 0.25,
       vy: Math.sin(angle) * speed + asteroid.vy * 0.25,
       size: childSize,
+      role: childRole,
       radius: ASTEROID_RADIUS[childSize],
       hp: childHp,
       maxHp: childHp,
       xpReward: ASTEROID_XP_REWARD[childSize],
-      contactDamage: getAsteroidContactDamage(getCellLevel(state.currentCell), childSize),
+      contactDamage: getAsteroidContactDamage(level, childSize),
       hpVisible: false,
       hitFlashUntil: 0,
       hitScaleUntil: 0,
@@ -1015,6 +1185,70 @@ function spawnChildAsteroids(state: GameState, asteroid: Asteroid) {
   }
 
   return children;
+}
+
+export function pickAsteroidRole(level: number, random: () => number): AsteroidRole {
+  const weights = getAsteroidRoleWeights(level);
+  const entries = Object.entries(weights) as Array<[AsteroidRole, number]>;
+  const totalWeight = entries.reduce((sum, [, weight]) => sum + weight, 0);
+  let roll = random() * totalWeight;
+  for (const [role, weight] of entries) {
+    roll -= weight;
+    if (roll <= 0) {
+      return role;
+    }
+  }
+  return entries[entries.length - 1]?.[0] ?? 'normal';
+}
+
+export function getAsteroidSpeed(size: AsteroidSize, role: AsteroidRole, random: () => number) {
+  const base = ASTEROID_BASE_SPEED[size] * randomRange(random, 0.8, 1.2);
+  if (role === 'fast') {
+    return ASTEROID_BASE_SPEED[size] * randomRange(random, 1.5, 2.0);
+  }
+  return base;
+}
+
+export function getAsteroidHp(size: AsteroidSize, role: AsteroidRole) {
+  const base = ASTEROID_HP[size];
+  if (role === 'fast') {
+    return Math.max(1, Math.round(base * 0.7));
+  }
+  if (role === 'splitter') {
+    return Math.max(1, Math.round(base * 0.8));
+  }
+  return base;
+}
+
+export function computeSplitCount(level: number, asteroid: Asteroid, random: () => number) {
+  const role = asteroid.role ?? 'normal';
+  if (asteroid.size === 1) {
+    return 0;
+  }
+
+  let count;
+  if (level <= 2) {
+    count = asteroid.size === 3 ? 2 : 1;
+  } else if (level <= 5) {
+    count = asteroid.size === 3 ? 2 : 2;
+  } else {
+    count = asteroid.size === 3 ? 3 : 2 + (random() < 0.5 ? 1 : 0);
+  }
+
+  if (role === 'fast') {
+    count -= 1;
+  } else if (role === 'splitter') {
+    count += 1;
+    if (random() < 0.3) {
+      count += 1;
+    }
+  }
+
+  return Math.max(0, count);
+}
+
+function randomRange(random: () => number, min: number, max: number) {
+  return min + (max - min) * random();
 }
 
 export function normalizeCellX(x: number) {
@@ -1028,27 +1262,46 @@ export function normalizeCellCoord(cell: CellCoord) {
   };
 }
 
-function getAsteroidHp(level: number, size: AsteroidSize) {
-  const largeHp = 12 + 4 * (level - 1);
-  if (size === 3) {
-    return largeHp;
-  }
-  if (size === 2) {
-    return Math.max(1, Math.floor(largeHp / 2));
-  }
-  return Math.max(1, Math.floor(largeHp / 4));
-}
-
-function descendantAsteroidHp(level: number, size: AsteroidSize): number {
-  if (size === 1) {
+function descendantAsteroidHp(level: number, asteroid: Asteroid): number {
+  if (asteroid.size === 1) {
     return 0;
   }
 
-  if (size === 2) {
-    return 3 * getAsteroidHp(level, 1);
-  }
+  const childSize = (asteroid.size - 1) as AsteroidSize;
+  const childHp = getAsteroidHp(childSize, 'normal');
+  const childTreeHp = childHp + descendantAsteroidHp(level, {
+    ...asteroid,
+    size: childSize,
+    role: 'normal',
+    hp: childHp,
+    maxHp: childHp,
+  });
+  return estimateSplitCount(level, asteroid) * childTreeHp;
+}
 
-  return 3 * (getAsteroidHp(level, 2) + descendantAsteroidHp(level, 2));
+function estimateSplitCount(level: number, asteroid: Asteroid) {
+  const role = asteroid.role ?? 'normal';
+  const base = baseSplitCount(level, asteroid.size);
+  if (role === 'fast') {
+    return Math.max(0, base - 1);
+  }
+  if (role === 'splitter') {
+    return base + 1;
+  }
+  return base;
+}
+
+function baseSplitCount(level: number, size: AsteroidSize) {
+  if (size === 1) {
+    return 0;
+  }
+  if (level <= 2) {
+    return size === 3 ? 2 : 1;
+  }
+  if (level <= 5) {
+    return size === 3 ? 2 : 2;
+  }
+  return size === 3 ? 3 : 2;
 }
 
 function getAsteroidContactDamage(level: number, size: AsteroidSize) {

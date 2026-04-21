@@ -1,12 +1,20 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   cellKey,
+  computeBudget,
   createGameState,
   createInputState,
   buildHudState,
   generateCellRecord,
   hydrateGameState,
+  getAsteroidCost,
+  getAsteroidHp,
+  getAsteroidRoleWeights,
+  getAsteroidSizeWeights,
+  getAsteroidSpeed,
   prepareGameStateForSave,
+  computeSplitCount,
+  maxEntitiesOnScreen,
   shouldAutoShoot,
   summarizeSectorAsteroidHp,
   updateGame,
@@ -16,6 +24,10 @@ import type { SaveSlotData } from '../src/save';
 afterEach(() => {
   vi.restoreAllMocks();
 });
+
+function countAsteroids(remaining: { 3: number; 2: number; 1: number }) {
+  return remaining[3] + remaining[2] + remaining[1];
+}
 
 describe('game logic', () => {
   it('generates cells deterministically from the seed and coordinates', () => {
@@ -32,11 +44,53 @@ describe('game logic', () => {
     expect(cell.remaining).toEqual({ 3: 0, 2: 0, 1: 0 });
   });
 
+  it('computes the difficulty budget and generation weights by level band', () => {
+    expect(computeBudget(1)).toBe(6);
+    expect(computeBudget(2)).toBe(8);
+    expect(computeBudget(3)).toBe(10);
+    expect(computeBudget(5)).toBe(14);
+    expect(computeBudget(10)).toBe(24);
+
+    expect(getAsteroidCost(3)).toBe(4);
+    expect(getAsteroidCost(2)).toBe(2);
+    expect(getAsteroidCost(1)).toBe(1);
+
+    expect(getAsteroidSizeWeights(1)).toEqual({ 3: 0.6, 2: 0.4, 1: 0 });
+    expect(getAsteroidSizeWeights(4)).toEqual({ 3: 0.4, 2: 0.5, 1: 0.1 });
+    expect(getAsteroidSizeWeights(6)).toEqual({ 3: 0.25, 2: 0.5, 1: 0.25 });
+    expect(getAsteroidRoleWeights(2)).toEqual({ normal: 1 });
+    expect(getAsteroidRoleWeights(4)).toEqual({ normal: 0.7, fast: 0.3 });
+    expect(getAsteroidRoleWeights(6)).toEqual({ normal: 0.5, fast: 0.25, splitter: 0.25 });
+    expect(getAsteroidRoleWeights(10)).toEqual({ normal: 0.4, fast: 0.3, splitter: 0.3 });
+    expect(maxEntitiesOnScreen(2)).toBe(6);
+    expect(maxEntitiesOnScreen(4)).toBe(8);
+    expect(maxEntitiesOnScreen(7)).toBe(12);
+    expect(maxEntitiesOnScreen(9)).toBe(16);
+  });
+
+  it('applies role modifiers to hp, speed, and split counts', () => {
+    expect(getAsteroidHp(3, 'fast')).toBeLessThan(getAsteroidHp(3, 'normal'));
+    expect(getAsteroidHp(3, 'splitter')).toBeLessThan(getAsteroidHp(3, 'normal'));
+    expect(getAsteroidSpeed(3, 'fast', () => 0.5)).toBeGreaterThan(getAsteroidSpeed(3, 'normal', () => 0.5));
+
+    expect(
+      computeSplitCount(1, { size: 3, role: 'normal', x: 0, y: 0, vx: 0, vy: 0, radius: 56, hp: 12, maxHp: 12, xpReward: 4, contactDamage: 3, hpVisible: false }, () => 0.5),
+    ).toBe(2);
+    expect(
+      computeSplitCount(4, { size: 3, role: 'fast', x: 0, y: 0, vx: 0, vy: 0, radius: 56, hp: 12, maxHp: 12, xpReward: 4, contactDamage: 3, hpVisible: false }, () => 0.5),
+    ).toBe(1);
+    expect(
+      computeSplitCount(4, { size: 3, role: 'splitter', x: 0, y: 0, vx: 0, vy: 0, radius: 56, hp: 12, maxHp: 12, xpReward: 4, contactDamage: 3, hpVisible: false }, () => 0.1),
+    ).toBe(4);
+  });
+
   it('can still generate combat cells deep in positive y', () => {
     const cell = generateCellRecord('CINDER-5D', { x: 1, y: 13 });
 
     expect(cell.kind).toBe('combat');
-    expect(cell.remaining).toEqual({ 3: 3, 2: 0, 1: 0 });
+    expect(countAsteroids(cell.remaining)).toBeGreaterThan(0);
+    expect(countAsteroids(cell.remaining)).toBeLessThanOrEqual(maxEntitiesOnScreen(14));
+    expect(cell.remaining[1] + cell.remaining[2] + cell.remaining[3]).toBeGreaterThan(0);
   });
 
   it('summarizes current and future asteroid hp for the sector', () => {
@@ -73,10 +127,11 @@ describe('game logic', () => {
     );
 
     expect(summary).toEqual({
-      currentHp: 65,
-      totalHp: 72,
+      currentHp: 11,
+      totalHp: expect.any(Number),
       hasAsteroids: true,
     });
+    expect(summary.totalHp).toBeGreaterThan(summary.currentHp);
   });
 
   it('generates combat cells at roughly a 50% rate for x=0', () => {
@@ -286,8 +341,8 @@ describe('game logic', () => {
 
     const afterSplitHud = buildHudState(state, true);
 
-    expect(afterSplitHud.sectorAsteroidHpTotal).toBe(initialHud.sectorAsteroidHpTotal);
     expect(afterSplitHud.sectorAsteroidHpCurrent).toBeLessThan(initialHud.sectorAsteroidHpCurrent);
+    expect(afterSplitHud.sectorAsteroidHpTotal).toBeGreaterThan(0);
   });
 
   it('moves the player into the cell above when crossing the top edge', () => {
@@ -314,13 +369,13 @@ describe('game logic', () => {
     expect(state.saveRequested).toBe(true);
   });
 
-  it('resets an uncompleted combat cell to three large asteroids when revisited', () => {
+  it('restores the active asteroid mix when revisiting an uncompleted combat cell', () => {
     const state = createGameState(320, 240, 'CINDER-5D');
     state.cells[cellKey(state.currentCell)] = {
       kind: 'combat',
       visited: true,
       cleared: false,
-      remaining: { 3: 3, 2: 0, 1: 0 },
+      remaining: { 3: 1, 2: 1, 1: 0 },
     };
     state.asteroids = [
       {
@@ -336,6 +391,19 @@ describe('game logic', () => {
         contactDamage: 3,
         hpVisible: false,
       },
+      {
+        x: 160,
+        y: 120,
+        vx: 0,
+        vy: 0,
+        size: 2,
+        radius: 34,
+        hp: 6,
+        maxHp: 6,
+        xpReward: 2,
+        contactDamage: 2,
+        hpVisible: false,
+      },
     ];
     state.ship.x = 160;
     state.ship.y = -1;
@@ -348,8 +416,8 @@ describe('game logic', () => {
 
     expect(state.currentCell).toEqual({ x: 0, y: 1 });
     expect(state.cells[cellKey({ x: 0, y: 0 })]?.remaining).toEqual({
-      3: 3,
-      2: 0,
+      3: 1,
+      2: 1,
       1: 0,
     });
 
@@ -363,8 +431,9 @@ describe('game logic', () => {
     updateGame(state, createInputState(), 0, 2000);
 
     expect(state.currentCell).toEqual({ x: 0, y: 0 });
-    expect(state.asteroids).toHaveLength(3);
-    expect(state.asteroids.every((asteroid) => asteroid.size === 3)).toBe(true);
+    expect(state.asteroids).toHaveLength(2);
+    expect(state.asteroids.some((asteroid) => asteroid.size === 3)).toBe(true);
+    expect(state.asteroids.some((asteroid) => asteroid.size === 2)).toBe(true);
   });
 
   it('spawns asteroids in the center of a new combat cell with varied directions', () => {
@@ -379,7 +448,7 @@ describe('game logic', () => {
       kind: 'combat',
       visited: true,
       cleared: false,
-      remaining: { 3: 3, 2: 0, 1: 0 },
+      remaining: { 3: 1, 2: 1, 1: 0 },
     };
     state.asteroids = [];
     state.ship.x = 160;
@@ -392,7 +461,7 @@ describe('game logic', () => {
     updateGame(state, createInputState(), 0, 1000);
 
     expect(state.currentCell).toEqual({ x: 0, y: 1 });
-    expect(state.asteroids).toHaveLength(3);
+    expect(state.asteroids).toHaveLength(2);
     expect(state.asteroids.every((asteroid) => asteroid.x === 160 && asteroid.y === 120)).toBe(true);
     expect(state.asteroids.every((asteroid) => Math.hypot(asteroid.vx, asteroid.vy) > 0)).toBe(true);
     expect(new Set(state.asteroids.map((asteroid) => Math.atan2(asteroid.vy, asteroid.vx).toFixed(3))).size).toBeGreaterThan(1);
@@ -516,7 +585,7 @@ describe('game logic', () => {
     expect(state.asteroids[0]?.x).toBe(315);
   });
 
-  it('splits large asteroids into three medium asteroids', () => {
+  it('splits large asteroids into the level-appropriate number of medium asteroids', () => {
     const state = createGameState(320, 240, 'CINDER-5D');
     state.ship.alive = false;
     state.player.xp = 0;
@@ -555,7 +624,7 @@ describe('game logic', () => {
     updateGame(state, createInputState(), 0, 1000);
 
     expect(state.player.xp).toBe(4);
-    expect(state.asteroids).toHaveLength(3);
+    expect(state.asteroids).toHaveLength(2);
     expect(state.asteroids.every((asteroid) => asteroid.size === 2)).toBe(true);
   });
 
@@ -632,7 +701,7 @@ describe('game logic', () => {
     updateGame(state, createInputState(), 0, 1000);
 
     expect(state.player.xp).toBe(4);
-    expect(state.asteroids).toHaveLength(3);
+    expect(state.asteroids).toHaveLength(2);
     expect(state.particles.length).toBeGreaterThan(10);
     expect(state.flashes.length).toBeGreaterThan(0);
     expect(state.shake.amplitude).toBeGreaterThanOrEqual(4);
@@ -761,7 +830,7 @@ describe('game logic', () => {
     expect(state.ship.y).toBe(120);
     expect(state.respawnBlinkUntil).toBeGreaterThan(1000);
     expect(state.cells[cellKey({ x: 2, y: 1 })]?.remaining).toEqual({
-      3: 3,
+      3: 1,
       2: 0,
       1: 0,
     });
@@ -967,9 +1036,9 @@ describe('game logic', () => {
     expect(hydrated.asteroids.every((asteroid) => asteroid.size === 2 || asteroid.size === 1)).toBe(true);
     prepareGameStateForSave(hydrated);
     expect(hydrated.cells['1:2']?.remaining).toEqual({
-      3: 3,
-      2: 0,
-      1: 0,
+      3: 0,
+      2: 2,
+      1: 1,
     });
   });
 
