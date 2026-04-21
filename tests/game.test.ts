@@ -209,7 +209,7 @@ describe('game logic', () => {
     expect(state.ship.recoilUntil).toBe(1070);
     expect(state.bullets).toHaveLength(1);
     expect(state.bullets[0]?.trailUntil).toBe(1090);
-    expect(state.nextShotAt).toBe(2000);
+    expect(state.nextShotAt).toBe(1250);
     expect(state.particles.length).toBeGreaterThan(0);
     expect(state.flashes.length).toBeGreaterThan(0);
     expect(state.shake.amplitude).toBe(1.5);
@@ -233,13 +233,13 @@ describe('game logic', () => {
 
     expect(state.bullets).toHaveLength(1);
     expect(state.bullets[0]?.damage).toBe(2);
-    expect(state.nextShotAt).toBe(1500);
+    expect(state.nextShotAt).toBe(1125);
 
-    updateGame(state, input, 0, 1499);
+    updateGame(state, input, 0, 1124);
 
     expect(state.bullets).toHaveLength(1);
 
-    updateGame(state, input, 0, 1500);
+    updateGame(state, input, 0, 1125);
 
     expect(state.bullets).toHaveLength(2);
     expect(state.bullets[1]?.damage).toBe(2);

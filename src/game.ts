@@ -743,7 +743,7 @@ function tryShoot(state: GameState, now: number) {
   };
 
   state.bullets.push(bullet);
-  state.nextShotAt = now + 1000 / Math.max(1, state.player.level);
+  state.nextShotAt = now + 1000 / (4 * Math.max(1, state.player.level));
   state.ship.vx -= Math.cos(state.ship.angle) * 18;
   state.ship.vy -= Math.sin(state.ship.angle) * 18;
   state.ship.recoilUntil = now + 70;
